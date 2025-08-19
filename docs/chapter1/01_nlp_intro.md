@@ -4,11 +4,11 @@
 >
 > 本章将带你走进NLP的世界，了解这个让机器"听懂"人话、"说"人话的技术。
 
-## 一、什么是自然语言处理？
+## 一、自然语言处理是什么？
 
 ### 1.1 基本定义
 
-**自然语言处理 (Natural Language Processing, NLP)** 是人工智能（AI）的一个核心领域，它赋予计算机**理解、解释、生成人类语言**的能力，并基于这些能力**对文本数据进行决策**。
+**自然语言处理 (Natural Language Processing, NLP)** 是人工智能（AI）的一个核心领域，它赋予计算机**理解、解释、生成人类语言**的能力，并基于这些能力**对文本数据进行决策**。[^1]
 
 -   **通俗理解**：就是教会计算机"读懂"文字、"听懂"语音，并能像人一样"说出"话语、完成任务。
 -   **技术视角**：NLP旨在弥合人类交流的模糊性、情境性和复杂性与计算机精确、形式化的指令系统之间的鸿沟。例如，计算机需要理解"我今天很蓝"，这里的"蓝"并非颜色，而是情绪的表达——这对机器是巨大挑战。
@@ -52,7 +52,7 @@ NLP的发展并非一蹴而就，它经历了从符号主义到连接主义，�
 
 ![NLP的发展历程](./images/1_2.gif)
 
-### 2.1 萌芽期 (1950s)：图灵测试与早期探索
+### 2.1 萌芽期 (1950s)：图灵测试与早期探索[^2]
 
 -   **1950年**：阿兰·图灵发表论文《计算机器与智能》，提出"**图灵测试**"，这成为了衡量机器智能的终极愿景，也为NLP设定了宏伟目标。
 -   **1954年**：乔治敦-IBM实验首次实现了俄语到英语的自动翻译，证明了机器处理语言的可能性。当时的科学家乐观地预测:"3-5年内，机器翻译将成为已解决的问题"-事实证明，他们低估了语言的复杂性。
@@ -79,12 +79,12 @@ NLP的发展并非一蹴而就，它经历了从符号主义到连接主义，�
 
 神经网络的复兴，特别是深度学习，为NLP带来了革命性的突破。
 
--   **词向量的诞生 (2013)**：**Word2Vec**将词语表示为稠密的数字向量，让词语的"语义"可以被计算。经典的例子是 `vector('国王') - vector('男人') + vector('女人')` 的结果与 `vector('女王')` 高度相似，标志着机器开始真正"理解"词义。
+-   **词向量的诞生 (2013)**：**Word2Vec**将词语表示为稠密的数字向量，让词语的"语义"可以被计算。经典的例子是 `vector('国王') - vector('男人') + vector('女人')` 的结果与 `vector('女王')` 高度相似，标志着机器开始真正"理解"词义。[^3]
 
 -   **里程碑模型**：
-    -   **2017年 - Transformer**：论文《Attention Is All You Need》发布，其提出的**注意力机制 (Attention Mechanism)** 允许模型在处理一个词时，同时"关注"句子中的所有其他词，极大地提升了处理长距离依赖的能力，成为后续所有大模型的基础架构。
-    -   **2018年 - BERT**：它像一个"完形填空"大师，通过同时观察上下文来预测被遮盖的词语（双向训练），从而对语境有了更深刻的理解。BERT的出现刷新了几乎所有NLP任务的榜单，开启了**预训练-微调 (Pre-train & Fine-tune)** 的新范式。
-    -   **2020年 - GPT-3**：以其1750亿的庞大参数量，展现了惊人的**少样本/零样本 (Few/Zero-shot)** 学习能力，即无需大量标注数据也能完成新任务，标志着**大语言模型 (LLM)** 时代的到来。
+    -   **2017年 - Transformer**：论文《Attention Is All You Need》发布，其提出的**注意力机制 (Attention Mechanism)** 允许模型在处理一个词时，同时"关注"句子中的所有其他词，极大地提升了处理长距离依赖的能力，成为后续所有大模型的基础架构。[^4]
+    -   **2018年 - BERT**：它像一个"完形填空"大师，通过同时观察上下文来预测被遮盖的词语（双向训练），从而对语境有了更深刻的理解。BERT的出现刷新了几乎所有NLP任务的榜单，开启了**预训练-微调 (Pre-train & Fine-tune)** 的新范式。[^5]
+    -   **2020年 - GPT-3**：以其1750亿的庞大参数量，展现了惊人的**少样本/零样本 (Few/Zero-shot)** 学习能力，即无需大量标注数据也能完成新任务，标志着**大语言模型 (LLM)** 时代的到来。[^6]
     -   **2022年 - ChatGPT**：通过**指令微调**和**人类反馈强化学习 (RLHF)**，ChatGPT将大模型的能力以流畅对话的形式呈现给公众，引发了全球性的AI浪潮。
 
 ## 三、NLP的主要任务
@@ -125,3 +125,17 @@ NLP的发展并非一蹴而就，它经历了从符号主义到连接主义，�
 ## 五、小结
 
 从图灵测试到ChatGPT，NLP走过了70多年的发展历程。虽然还有很多挑战待解决，但已经能够看到机器理解和生成语言的巨大潜力。接下来的章节，我们将深入学习NLP的核心技术和实际应用。
+
+## 参考文献
+
+[^1]: [Manning, C. (2024). *CS224N: Natural Language Processing with Deep Learning*. Stanford University](https://web.stanford.edu/class/cs224n/)
+
+[^2]: [Turing, A. M. (1950). *Computing Machinery and Intelligence*. Mind, 59(236), 433-460](https://academic.oup.com/mind/article-abstract/LIX/236/433/986238)
+
+[^3]: [Mikolov, T., Chen, K., Corrado, G., & Dean, J. (2013). *Efficient Estimation of Word Representations in Vector Space*. arXiv:1301.3781](https://arxiv.org/abs/1301.3781)
+
+[^4]: [Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A. N., Kaiser, L., & Polosukhin, I. (2017). *Attention Is All You Need*. arXiv:1706.03762](https://arxiv.org/abs/1706.03762)
+
+[^5]: [Devlin, J., Chang, M. W., Lee, K., & Toutanova, K. (2018). *BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding*. arXiv:1810.04805](https://arxiv.org/abs/1810.04805)
+
+[^6]: [Brown, T., Mann, B., Ryder, N., Subbiah, M., Kaplan, J. D., Dhariwal, P., Neelakantan, A., Shyam, P., Sastry, G., Askell, A., Agarwal, S., Herbert-Voss, A., Krueger, G., Henighan, T., Child, R., Ramesh, A., Ziegler, D., Wu, J., Winter, C., Hesse, C., Chen, M., Sigler, E., Litwin, M., Gray, S., Chess, B., Clark, J., Berner, C., McCandlish, S., Radford, A., Sutskever, I., & Amodei, D. (2020). *Language Models are Few-Shot Learners*. arXiv:2005.14165](https://arxiv.org/abs/2005.14165)
