@@ -126,6 +126,8 @@ NLP的发展并非一蹴而就，它经历了从符号主义到连接主义，�
 
 从图灵测试到ChatGPT，NLP走过了70多年的发展历程。虽然还有很多挑战待解决，但已经能够看到机器理解和生成语言的巨大潜力。接下来的章节，我们将深入学习NLP的核心技术和实际应用。
 
+---
+
 ## 参考文献
 
 [^1]: [Manning, C. (2024). *CS224N: Natural Language Processing with Deep Learning*. Stanford University](https://web.stanford.edu/class/cs224n/)
