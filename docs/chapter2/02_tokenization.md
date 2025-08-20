@@ -1,8 +1,8 @@
-# 二、初级分词技术
+# 第一节 初级分词技术
 
 要让计算机开始理解人类语言，首先要做的就是把连续不断的文本“敲碎”，变成一块块有意义的“积木”——这个过程就是**分词 (Tokenization)**。如果说文本是一座宏伟的建筑，那么“词”就是构成这座建筑的砖瓦。分词任务的质量，直接决定了上层建筑（如信息检索、机器翻译、情感分析等）的稳固程度。
 
-## 1. 分词的定义与重要性
+## 一、分词的定义与重要性
 
 **分词 (Tokenization / Word Segmentation)** 的任务，是把连续的文本序列切分成具有独立语义的基本单元（即“词”或“词元”）。
 
@@ -11,7 +11,7 @@
 
 > 在传统的NLP处理流程中，分词是后续所有任务的基础。其处理范式通常是将分词作为一个独立且“硬性”的预处理步骤，这意味着一个微小的分词错误就可能导致语义信息的丢失。这种错误会在后续的处理链条中被不断放大，产生“差之毫厘，谬以千里”的级联效应 (Cascading Effect)。例如，在传统的搜索引擎里，一旦“南京市长江大桥”被错分为 ["南京", "市长", "江大桥"]，系统就很难再从这三个错误的词块中还原出原始的、正确的地理位置含义，从而导致搜索结果完全跑偏。现代的NLP方法则通过更灵活的切分策略，在很大程度上缓解了这个问题。
 
-## 2. 通过jieba认识分词[^2]
+## 二、通过jieba认识分词[^2]
 
 > [本节完整代码](https://github.com/FutureUnreal/base-nlp/blob/main/code/C2/01_jieba.py)
 
@@ -149,9 +149,9 @@ print(f"加载词典后: {jieba.lcut(text, cut_all=False)}")
 
 ### 2.3 统计学习时代的方法
 
-为了解决对人工词典的过度依赖，研究者们转向了统计学习。其核心思想是把分词看作一个**序列标注**问题。即为每个字标注其在词中的位置（`B-Begin`, `M-Middle`, `E-End`, `S-Single`），然后利用**隐马尔可夫模型（HMM）**等模型来预测每个字最可能的位置标签序列。
+为了解决对人工词典的过度依赖，研究者们转向了统计学习。其核心思想是把分词看作一个**序列标注**问题。即为每个字标注其在词中的位置（`B-Begin`, `M-Middle`, `E-End`, `S-Single`），然后利用 **隐马尔可夫模型（HMM）** 等模型来预测每个字最可能的位置标签序列。
 
-在统计方法时代，分词被巧妙地转化成了一个**序列标注（Sequence Labeling）**问题。即为句子中的每个字打上一个位置标签，例如：
+在统计方法时代，分词被巧妙地转化成了一个**序列标注**问题。即为句子中的每个字打上一个位置标签，例如：
 -   `B` (Begin)：词的开始
 -   `M` (Middle)：词的中间
 -   `E` (End)：词的结束
@@ -199,7 +199,7 @@ HMM关闭: ['我', '在', 'Boss', '直', '聘', '找', '工作']
 
 #### 2.3.2 词性标注
 
-除了分词，`jieba` 还提供了词性标注功能。它采用了一种**词典查询与隐马尔可夫模型（HMM）相结合**的混合策略，来识别出每个词语的语法属性（名词、动词、形容词等）。这需要使用`jieba.posseg`模块。
+除了分词，`jieba` 还提供了词性标注功能。采用了**词典查询与隐马尔可夫模型（HMM）相结合**的混合策略，来识别出每个词语的语法属性（名词、动词、形容词等）。这需要使用`jieba.posseg`模块。
 
 由于在前面已经通过 `jieba.load_userdict()` 加载了包含“奔波儿灞”的词典，因此 `jieba` 已经能够正确地将其切分出来。但是，因为初始词典未提供词性，`jieba` 会给它一个默认的、不一定准确的词性（如下面的`x`）。
 
@@ -303,6 +303,11 @@ BPE的核心思想是：在原始的字符语料库上，迭代地将高频的�
 
 子词分词是当前大语言模型处理文本的标准方案，既保留了词的语义信息，又具备了字的灵活性。
 
+## 练习
+
+- 尝试修改user_pos_dict.txt中九和头的词频看看结果有什么不同
+- 自行更换代码中使用的text短句看看会得到什么输出
+
 ---
 
 ## 参考文献
@@ -311,6 +316,6 @@ BPE的核心思想是：在原始的字符语料库上，迭代地将高频的�
 
 [^2]: **未登录词 (Out-of-Vocabulary, OOV)**: 指在模型的词典（Vocabulary）中没有收录的词。当模型在处理文本时遇到一个它在训练阶段从未见过的词时，这个词就是一个未登录词。这是传统基于词典的NLP方法面临的一大挑战，因为模型不知道如何处理这些词，常常导致错误的切分。
 
-[^3]: Rabiner, L. R. (1989). *A tutorial on hidden Markov models and selected applications in speech recognition*. Proceedings of the IEEE, 77(2), 257-286. [PDF](https://www.ece.ucsb.edu/Faculty/Rabiner/ece259/Reprints/tutorial%20on%20hmm%20and%20applications.pdf)
+[^3]: [Xue, N. (2003). *Chinese Word Segmentation as Character Tagging*. International Journal of Computational Linguistics & Chinese Language Processing, 8(1), 29-48](https://aclanthology.org/O03-4002/)
 
 [^4]: Sennrich, R., Haddow, B., & Birch, A. (2016). *Neural Machine Translation of Rare Words with Subword Units*. arXiv:1508.07909. [https://arxiv.org/abs/1508.07909](https://arxiv.org/abs/1508.07909)
