@@ -324,9 +324,7 @@ $$
 我们希望最大化正样本的概率，同时最小化所有负样本的概率。这通过 `Sigmoid` 函数来实现。对于一个样本 `(w, c)`，其损失函数（使用对数似然）为：
 
 $$
-
-J = \log\sigma(v_c^T v_w) + \sum_{i=1}^{k} \mathbb{E}_{w_i \sim P_n(w)}[\log\sigma(-v_{w_i}^T v_w)]
-
+J = \log\sigma(v_c^T v_w) + \sum_{i=1}^{k} E_{w_i \sim P_n(w)}[\log\sigma(-v_{w_i}^T v_w)]
 $$
 
 -   $v_c$ 和 $v_w$ 分别是中心词和上下文词的向量。
