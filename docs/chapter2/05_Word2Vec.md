@@ -128,7 +128,7 @@ Word2Vec包含两种具体的实现模型：CBOW和Skip-gram。两者在任务�
 
 #### 3.3.1 CBOW 模型详解
 
-CBOW (Continuous Bag-of-Words) 的任务是**“根据上下文预测中心词”**。
+CBOW (Continuous Bag-of-Words) 的任务是 **“根据上下文预测中心词”** 。
 
 ![CBOW](./images/3_3_3_1.svg)
 
@@ -279,7 +279,7 @@ $$
 Softmax函数的计算公式为：
 
 $$
-P(w_O) = \frac{\exp({v'}_{w_O}^T v_{w_I})}{\sum_{w=1}^{V} \exp({v'}_{w}^T v_{w_I})}
+P(w_O|w_I) = \frac{\exp({v'}_{w_O}^T v_{w_I})}{\sum_{w=1}^{V} \exp({v'}_{w}^T v_{w_I})}
 $$
 
 问题出在分母上：为了计算一个词的输出概率，需要遍历词典中的**所有**词（$V$通常是几十万甚至上百万），计算它们与输入词的得分并求和。这意味着，模型每处理一个训练样本，就需要进行一次涉及整个词典的庞大计算，这使得训练过程异常缓慢。
