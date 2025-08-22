@@ -102,9 +102,20 @@ Word2Vec 通常被认为是一种**浅层神经网络模型（Shallow Neural Net
 
 由于One-Hot向量只有一个位置是1，这个矩阵乘法的结果，等效于直接从矩阵 `W` 中 **“抽取”出索引为3的那一行** 。
 
-$$\begin{split}
-\begin{bmatrix} 0 & 0 & 0 & \mathbf{1} & 0 & 0 \end{bmatrix} \times \begin{bmatrix} 2 & 8 & 5 & 3 & 1 \\ 9 & 4 & 7 & 2 & 6 \\ 3 & 1 & 8 & 5 & 0 \\ 5 & 6 & 2 & 9 & 4 \\ 8 & 0 & 3 & 7 & 2 \\ 4 & 2 & 9 & 6 & 1 \end{bmatrix} = \begin{bmatrix} \mathbf{5} & \mathbf{6} & \mathbf{2} & \mathbf{9} & \mathbf{4} \end{bmatrix}
-\end{split}$$
+$$
+\begin{bmatrix} 0 & 0 & 0 & 1 & 0 & 0 \end{bmatrix}
+\times
+\begin{bmatrix}
+2 & 8 & 5 & 3 & 1 \\
+9 & 4 & 7 & 2 & 6 \\
+3 & 1 & 8 & 5 & 0 \\
+5 & 6 & 2 & 9 & 4 \\
+8 & 0 & 3 & 7 & 2 \\
+4 & 2 & 9 & 6 & 1
+\end{bmatrix}
+=
+\begin{bmatrix} 5 & 6 & 2 & 9 & 4 \end{bmatrix}
+$$
 
 在实践中，为了极大地提升效率，程序并不会真的执行稀疏的矩阵乘法，而是直接实现一个**查询**操作：根据输入的单词ID，直接从 `W` 矩阵中获取对应的行向量。
 
@@ -167,12 +178,12 @@ CBOW (Continuous Bag-of-Words) 的任务是**“根据上下文预测中心词�
 4.  **损失函数**：模型的优化目标是最小化负对数似然：
 
     $$
-    \begin{aligned}
+    \begin{split}
     \text{minimize } J &= -\log P(w_c | w_{c-m}, \ldots, w_{c-1}, w_{c+1}, \ldots, w_{c+m}) \\
     &= -\log P(u_c | \hat{v}) \\
     &= -\log \frac{\exp(u_c^T \hat{v})}{\sum_{j=1}^{|V|} \exp(u_j^T \hat{v})} \\
     &= -u_c^T \hat{v} + \log \sum_{j=1}^{|V|} \exp(u_j^T \hat{v})
-    \end{aligned}
+    \end{split}
     $$
 
     其中 $u_c$ 是目标中心词的输出向量，$\hat{v}$ 是上下文向量。
@@ -212,13 +223,13 @@ CBOW (Continuous Bag-of-Words) 的任务是**“根据上下文预测中心词�
 3.  **损失函数**：模型的优化目标是最小化负对数似然。完整的数学推导过程如下：
 
     $$
-    \begin{aligned}
+    \begin{split}
     \text{minimize } J &= -\log P(w_{c-m}, \ldots, w_{c-1}, w_{c+1}, \ldots, w_{c+m} | w_c) \\
     &= -\log \prod_{j=0, j \neq m}^{2m} P(w_{c-m+j} | w_c) \\
     &= -\log \prod_{j=0, j \neq m}^{2m} P(u_{c-m+j} | v_c) \\
     &= -\log \prod_{j=0, j \neq m}^{2m} \frac{\exp(u_{c-m+j}^T v_c)}{\sum_{k=1}^{|V|} \exp(u_k^T v_c)} \\
     &= -\sum_{j=0, j \neq m}^{2m} u_{c-m+j}^T v_c + 2m \log \sum_{k=1}^{|V|} \exp(u_k^T v_c)
-    \end{aligned}
+    \end{split}
     $$
     
     其中 $v_c$ 是中心词的输入向量，$u_{c-m+j}$ 是上下文词的输出向量。
