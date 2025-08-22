@@ -165,28 +165,28 @@ $$
 
 2.  **上下文向量**：将上下文窗口中所有词的词向量求和：
 
-    $$
-    v_c = v_{c-m} + \cdots + v_{c-1} + v_{c+1} + \cdots + v_{c+m}
-    $$
+$$
+v_c = v_{c-m} + \cdots + v_{c-1} + v_{c+1} + \cdots + v_{c+m}
+$$
 
 3.  **输出得分**：将上下文向量与输出矩阵 $V$ 相乘：
 
-    $$
-    z_c = Vv_c
-    $$
+$$
+z_c = Vv_c
+$$
 
 4.  **损失函数**：模型的优化目标是最小化负对数似然：
 
-    $$
-    \begin{aligned}
-    \text{minimize } J &= -\log P(w_c | w_{c-m}, \ldots, w_{c-1}, w_{c+1}, \ldots, w_{c+m}) \\
-    &= -\log P(u_c | \hat{v}) \\
-    &= -\log \frac{\exp(u_c^T \hat{v})}{\sum_{j=1}^{|V|} \exp(u_j^T \hat{v})} \\
-    &= -u_c^T \hat{v} + \log \sum_{j=1}^{|V|} \exp(u_j^T \hat{v})
-    \end{aligned}
-    $$
+$$
+\begin{aligned}
+\text{minimize } J &= -\log P(w_c | w_{c-m}, \ldots, w_{c-1}, w_{c+1}, \ldots, w_{c+m}) \\
+&= -\log P(u_c | \hat{v}) \\
+&= -\log \frac{\exp(u_c^T \hat{v})}{\sum_{j=1}^{|V|} \exp(u_j^T \hat{v})} \\
+&= -u_c^T \hat{v} + \log \sum_{j=1}^{|V|} \exp(u_j^T \hat{v})
+\end{aligned}
+$$
 
-    其中 $u_c$ 是目标中心词的输出向量，$\hat{v}$ 是上下文向量。
+其中 $u_c$ 是目标中心词的输出向量，$\hat{v}$ 是上下文向量。
 
 #### 3.3.2 Skip-gram 模型详解
 
