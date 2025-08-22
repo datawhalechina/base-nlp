@@ -102,7 +102,7 @@ Word2Vec 通常被认为是一种**浅层神经网络模型（Shallow Neural Net
 
 由于One-Hot向量只有一个位置是1，这个矩阵乘法的结果，等效于直接从矩阵 `W` 中 **“抽取”出索引为3的那一行** 。
 
-$$
+```math
 \begin{bmatrix} 0 & 0 & 0 & \color{#42b983}{1} & 0 & 0 \end{bmatrix}
 \times
 \begin{bmatrix}
@@ -115,7 +115,7 @@ $$
 \end{bmatrix}
 =
 \begin{bmatrix} \color{#42b983}{5} & \color{#42b983}{6} & \color{#42b983}{2} & \color{#42b983}{9} & \color{#42b983}{4} \end{bmatrix}
-$$
+```
 
 在实践中，为了极大地提升效率，程序并不会真的执行稀疏的矩阵乘法，而是直接实现一个**查询**操作：根据输入的单词ID，直接从 `W` 矩阵中获取对应的行向量。
 
