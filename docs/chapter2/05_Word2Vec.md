@@ -210,29 +210,29 @@ $$
 
 1.  **词向量转换**：对于中心词 $w_c$，从输入矩阵 $U$ 中获取对应的词向量：
 
-    $$
-    v_c = Uw_c
-    $$
+$$
+v_c = Uw_c
+$$
 
 2.  **输出得分计算**：将中心词向量与输出矩阵 $V$ 相乘：
 
-    $$
-    z_{2m} = V_{2m}v_c
-    $$
+$$
+z_{2m} = V_{2m}v_c
+$$
 
 3.  **损失函数**：模型的优化目标是最小化负对数似然。完整的数学推导过程如下：
 
-    $$
-    \begin{aligned}
-    \text{minimize } J &= -\log P(w_{c-m}, \ldots, w_{c-1}, w_{c+1}, \ldots, w_{c+m} | w_c) \\
-    &= -\log \prod_{j=0, j \neq m}^{2m} P(w_{c-m+j} | w_c) \\
-    &= -\log \prod_{j=0, j \neq m}^{2m} P(u_{c-m+j} | v_c) \\
-    &= -\log \prod_{j=0, j \neq m}^{2m} \frac{\exp(u_{c-m+j}^T v_c)}{\sum_{k=1}^{|V|} \exp(u_k^T v_c)} \\
-    &= -\sum_{j=0, j \neq m}^{2m} u_{c-m+j}^T v_c + 2m \log \sum_{k=1}^{|V|} \exp(u_k^T v_c)
-    \end{aligned}
-    $$
-    
-    其中 $v_c$ 是中心词的输入向量，$u_{c-m+j}$ 是上下文词的输出向量。
+$$
+\begin{aligned}
+\text{minimize } J &= -\log P(w_{c-m}, \ldots, w_{c-1}, w_{c+1}, \ldots, w_{c+m} | w_c) \\
+&= -\log \prod_{j=0, j \neq m}^{2m} P(w_{c-m+j} | w_c) \\
+&= -\log \prod_{j=0, j \neq m}^{2m} P(u_{c-m+j} | v_c) \\
+&= -\log \prod_{j=0, j \neq m}^{2m} \frac{\exp(u_{c-m+j}^T v_c)}{\sum_{k=1}^{|V|} \exp(u_k^T v_c)} \\
+&= -\sum_{j=0, j \neq m}^{2m} u_{c-m+j}^T v_c + 2m \log \sum_{k=1}^{|V|} \exp(u_k^T v_c)
+\end{aligned}
+$$
+
+其中 $v_c$ 是中心词的输入向量，$u_{c-m+j}$ 是上下文词的输出向量。
 
 **模型对比**
 
@@ -288,7 +288,7 @@ $$
 
 ### 4.1 Hierarchical Softmax
 
-**Hierarchical Softmax** 是一种将计算量巨大的多分类问题巧妙转化为一系列二分类问题的优化技巧。它利用**霍夫曼树（Huffman Tree）**来组织词典。
+**Hierarchical Softmax** 是一种将计算量巨大的多分类问题巧妙转化为一系列二分类问题的优化技巧。它利用 **霍夫曼树（Huffman Tree）** 来组织词典。
 
 该方法不再直接计算一个词在整个词典上的概率分布，而是将其转化为从霍夫曼树的根节点开始，经过一系列决策最终到达目标词对应的叶子节点的过程。
 
@@ -324,7 +324,9 @@ $$
 我们希望最大化正样本的概率，同时最小化所有负样本的概率。这通过 `Sigmoid` 函数来实现。对于一个样本 `(w, c)`，其损失函数（使用对数似然）为：
 
 $$
+
 J = \log\sigma(v_c^T v_w) + \sum_{i=1}^{k} \mathbb{E}_{w_i \sim P_n(w)}[\log\sigma(-v_{w_i}^T v_w)]
+
 $$
 
 -   $v_c$ 和 $v_w$ 分别是中心词和上下文词的向量。
