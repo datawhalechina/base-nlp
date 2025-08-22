@@ -1,8 +1,7 @@
-- 第1章 [我是第1章的标题](chapter1/chapter1)
-- 第2章 我是第2章的标题
-    - [2.1 我是2.1的标题](chapter2/chapter2_1)
-    - [2.2 我是2.2的标题](chapter2/chapter2_2)
-- 第3章 我是第3章的标题
-    - 3.1 我是3.1的标题
-        - 3.1.1 [我是3.1.1的标题](chapter3/chapter3_1/chapter3_1_1)
-        - 3.1.2 [我是3.1.2的标题](chapter3/chapter3_1/chapter3_1_2)
+- 目录
+    - 第一章 解锁RAG
+        - [第一节 NLP概述](chapter1/01_nlp_intro.md)
+    - 第二章 数据准备
+        - [第一节 初级分词技术](chapter2/03_tokenization.md)
+        - [第二节 词向量表示](chapter2/04_word_vector.md)
+        - [第三节 从主题模型到Word2Vec](chapter2/05_Word2Vec.md)
