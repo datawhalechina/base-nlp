@@ -312,10 +312,10 @@ BPE的核心思想是：在原始的字符语料库上，迭代地将高频的�
 
 ## 参考文献
 
-[^1]: Sun, F. (2012). *jieba Chinese segmentation*. GitHub. [https://github.com/fxsjy/jieba](https://github.com/fxsjy/jieba)
+[^1]: [Sun, F. (2012). *jieba Chinese segmentation*. GitHub](https://github.com/fxsjy/jieba)
 
 [^2]: **未登录词 (Out-of-Vocabulary, OOV)**: 指在模型的词典（Vocabulary）中没有收录的词。当模型在处理文本时遇到一个它在训练阶段从未见过的词时，这个词就是一个未登录词。这是传统基于词典的NLP方法面临的一大挑战，因为模型不知道如何处理这些词，常常导致错误的切分。
 
 [^3]: [Xue, N. (2003). *Chinese Word Segmentation as Character Tagging*. International Journal of Computational Linguistics & Chinese Language Processing, 8(1), 29-48](https://aclanthology.org/O03-4002/)
 
-[^4]: Sennrich, R., Haddow, B., & Birch, A. (2016). *Neural Machine Translation of Rare Words with Subword Units*. arXiv:1508.07909. [https://arxiv.org/abs/1508.07909](https://arxiv.org/abs/1508.07909)
+[^4]: [Sennrich, R., Haddow, B., & Birch, A. (2016). *Neural Machine Translation of Rare Words with Subword Units*. arXiv:1508.07909](https://arxiv.org/abs/1508.07909)

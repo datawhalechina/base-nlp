@@ -212,8 +212,8 @@ $$ TF-IDF(t, d, D) = TF(t, d) \times IDF(t, D) $$
 
 ## 参考文献
 
-[^1]: Salton, G., Wong, A., & Yang, C. S. (1975). *A vector space model for automatic indexing*. Communications of the ACM, 18(11), 613-620.
+[^1]: [Salton, G., Wong, A., & Yang, C. S. (1975). *A vector space model for automatic indexing*. Communications of the ACM, 18(11), 613-620](https://doi.org/10.1145/361219.361220)
 
-[^2]: Jones, K. S. (1972). *A statistical interpretation of term specificity and its application in retrieval*. Journal of documentation, 28(1), 11-21.
+[^2]: [Jones, K. S. (1972). *A statistical interpretation of term specificity and its application in retrieval*. Journal of Documentation, 28(1), 11-21](https://doi.org/10.1108/eb026526)
 
-[^3]: Bengio, Y., Ducharme, R., Vincent, P., & Jauvin, C. (2003). *A neural probabilistic language model*. Journal of machine learning research, 3(Feb), 1137-1155.
+[^3]: [Bengio, Y., Ducharme, R., Vincent, P., & Jauvin, C. (2003). *A neural probabilistic language model*. Journal of Machine Learning Research, 3(Feb), 1137-1155](https://www.jmlr.org/papers/v3/bengio03a.html)
