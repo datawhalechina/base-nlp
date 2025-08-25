@@ -8,7 +8,7 @@
 
 ### 1.1 核心概念
 
-在使用Gensim时，会遇到几个核心概念：
+使用Gensim时，会遇到几个概念：
 
 1.  **语料库**：这是Gensim处理的主要对象，可以简单理解为**训练数据集**。分词后的文档通常表示为 `list[list[str]]`；用于 TF-IDF、LDA 等模型的标准 BoW 语料库是包含稀疏向量的可迭代对象，每篇文档表示为 `[(token_id, frequency), ...]`。例如 `[["我", "爱", "吃", "海参"], ["国足", "惨败", "泰国"]]` 中每个子列表代表一篇独立的文档。
 
@@ -53,6 +53,8 @@ pip install gensim
 
 这个最终生成的 **BoW语料库**，就是训练TF-IDF、LDA等模型的标准输入。
 
+> 以上三步适用于 TF-IDF、LSA、LDA、NMF 等基于 BoW 的模型；不适用于 Word2Vec/FastText/Doc2Vec 等神经网络词向量模型。后者直接以分词后的句子序列（`list[list[str]]`）为输入，无需词袋化。详见下文“Word2Vec模型实战”。
+
 ```python
 import jieba
 from gensim import corpora
@@ -62,7 +64,7 @@ raw_headlines = [
     "央行降息，刺激股市反弹",
     "球队赢得总决赛冠军，球员表现出色"
 ]
-tokenized_headlines = [list(jieba.cut(doc)) for doc in raw_headlines]
+tokenized_headlines = [jieba.lcut(doc) for doc in raw_headlines]
 print(f"分词后语料: {tokenized_headlines}")
 
 # Step 2: 创建词典
@@ -99,7 +101,7 @@ headlines = [
     "篮球巨星刷新历史得分记录",
     "理财产品收益率创下新高"
 ]
-tokenized_headlines = [list(jieba.cut(title)) for title in headlines]
+tokenized_headlines = [jieba.lcut(title) for title in headlines]
 
 # 2. 创建词典和BoW语料库
 dictionary = corpora.Dictionary(tokenized_headlines)
@@ -157,7 +159,7 @@ headlines = [
     "篮球巨星刷新历史得分记录",
     "理财产品收益率创下新高"
 ]
-tokenized_headlines = [list(jieba.cut(title)) for title in headlines]
+tokenized_headlines = [jieba.lcut(title) for title in headlines]
 
 # 2. 创建词典和BoW语料库
 dictionary = corpora.Dictionary(tokenized_headlines)
@@ -173,7 +175,7 @@ for topic in lda_model.print_topics():
 
 # 5. 推断新文档的主题分布
 new_headline = "詹姆斯获得常规赛MVP"
-new_headline_bow = dictionary.doc2bow(list(jieba.cut(new_headline)))
+new_headline_bow = dictionary.doc2bow(jieba.lcut(new_headline))
 topic_distribution = lda_model[new_headline_bow]
 print(f"\n新标题 '{new_headline}' 的主题分布:")
 print(topic_distribution)
@@ -214,7 +216,7 @@ headlines = [
     "篮球巨星刷新历史得分记录",
     "理财产品收益率创下新高"
 ]
-tokenized_headlines = [list(jieba.cut(title)) for title in headlines]
+tokenized_headlines = [jieba.lcut(title) for title in headlines]
 
 
 # 2. 训练Word2Vec模型 (核心参数的解释见下方)
