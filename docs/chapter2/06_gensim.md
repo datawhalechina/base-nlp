@@ -43,6 +43,8 @@ pip install gensim
 
 ## 二、Gensim工作流
 
+> [本节完整代码](https://github.com/FutureUnreal/base-nlp/blob/main/code/C2/04_gensim.ipynb)
+
 在Gensim中，将原始文本转换为TF-IDF或主题模型向量，通常遵循一个标准的三步流程。这个流程是后续应用的基础。
 
 1.  **准备语料**：将原始的文本文档进行分词，并整理成Gensim要求的格式——一个由列表构成的列表 `list[list[str]]`，其中每个子列表代表一篇独立的文档。
@@ -315,4 +317,4 @@ print(f"\n加载后，'球队' 和 '球员' 的相似度: {loaded_wv.similarity(
 
 ## 练习
 
-- 尝试通过修改Word2Vec的参数或headlines来提高'球队' 和 '球员' 的相似度
+- 尝试通过修改代码中Word2Vec函数的参数或headlines来提高 '球队' 和 '球员' 的相似度
