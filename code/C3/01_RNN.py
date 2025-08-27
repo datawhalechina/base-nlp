@@ -22,7 +22,7 @@ def prepare_inputs():
     emb_table = np.random.randn(V, E).astype(np.float32)
 
     # 取出序列词向量并加上 batch 维度: (B, T, E)
-    x_np = emb_table[ids][np.newaxis, :, :]
+    x_np = emb_table[ids][None]
     return tokens, x_np
 
 
