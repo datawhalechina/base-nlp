@@ -11,7 +11,7 @@
 
 > 在传统的NLP处理流程中，分词是后续所有任务的基础。其处理范式通常是将分词作为一个独立且“硬性”的预处理步骤，这意味着一个微小的分词错误就可能导致语义信息的丢失。这种错误会在后续的处理链条中被不断放大，产生“差之毫厘，谬以千里”的级联效应 (Cascading Effect)。例如，在传统的搜索引擎里，一旦“南京市长江大桥”被错分为 ["南京", "市长", "江大桥"]，系统就很难再从这三个错误的词块中还原出原始的、正确的地理位置含义，从而导致搜索结果完全跑偏。现代的NLP方法则通过更灵活的切分策略，在很大程度上缓解了这个问题。
 
-## 二、通过jieba认识分词[^2]
+## 二、通过jieba认识分词[^1]
 
 > [本节完整代码](https://github.com/FutureUnreal/base-nlp/blob/main/code/C2/01_jieba.py)
 
@@ -111,7 +111,12 @@ print(f"加载词典后: {jieba.lcut(text, cut_all=False)}")
 加载词典后: ['九头虫', '让', '奔波儿灞', '把', '唐僧', '师徒', '除掉']
 ```
 
-通过自定义词典，能很方便地解决 **未登录词（OOV）**[^1] 的问题，让分词结果符合预期，这在处理特定业务领域文本时尤其有用。
+通过自定义词典，能很方便地解决 **未登录词（OOV）** 的问题，让分词结果符合预期，这在处理特定业务领域文本时尤其有用。
+
+> **概念补充：什么未登录词（OOV）？**
+
+> 指在模型的词典（Vocabulary）中没有收录的词。当模型在处理文本时遇到一个它在训练阶段从未见过的词时，这个词就是一个未登录词。这是传统基于词典的NLP方法面临的一大挑战，因为模型不知道如何处理这些词，常常导致错误的切分。
+
 
 当向`jieba`中添加自定义词（如“奔波儿灞”）但**不指定词频**时，`jieba`会采取一种自动的方式来估算其词频。它会首先尝试对这个新词进行分词（例如，默认会切成 `["奔", "波", "儿", "灞"]`），然后基于这些组成部分的基础词频计算出一个概率。最后，给“奔波儿灞”这个整体赋予一个**略高于**其组成部分概率之积的词频。这样，在后续的分词计算中，模型就会更倾向于将“奔波儿灞”视为一个完整的词，从而实现了“强制”分词的效果。
 
@@ -162,7 +167,7 @@ print(f"加载词典后: {jieba.lcut(text, cut_all=False)}")
 
 这样，“我爱北京”就会被标注为 `S S B E`。分词任务就变成了为字序列寻找最合理的标签序列。
 
-隐马尔可夫模型是解决这类问题的经典生成式模型。它能学习到字与标签之间的对应关系（发射概率）以及标签与标签之间的转移关系（转移概率）。`jieba` 就利用了HMM来识别词典中不存在的 **OOV**[^3]。当基于词典的图算法在句子中遇到一个无法切分的、连续的未登录字串时，就会调用HMM模块对这个局部子句进行分词。
+隐马尔可夫模型是解决这类问题的经典生成式模型。它能学习到字与标签之间的对应关系（发射概率）以及标签与标签之间的转移关系（转移概率）。`jieba` 就利用了HMM来识别词典中不存在的 **OOV**[^2]。当基于词典的图算法在句子中遇到一个无法切分的、连续的未登录字串时，就会调用HMM模块对这个局部子句进行分词。
 
 -   **优点** ：能够发现词典外的新词，一定程度上解决了 OOV 问题。
 -   **缺点** ：HMM的两个核心假设（观测独立和齐次马尔可夫）过于严格，限制了其利用更丰富的上下文特征的能力，因此在处理复杂的歧义场景时效果不如后续的CRF等模型。
@@ -277,7 +282,7 @@ print(f"加载词性词典后: {dic_words}")
 
 以 `GPT` 系列为代表的大语言模型，则采用了更灵活的**子词
 （Subword）**切分方案，其中最主流的算法是 **BPE (Byte Pair 
-Encoding)**[^4]。
+Encoding)**[^3]。
 
 BPE的核心思想是：在原始的字符语料库上，迭代地将高频的相邻字节对
 （或字符对）合并成一个新的、更大的单元，并将其加入词表。
@@ -307,8 +312,6 @@ BPE的核心思想是：在原始的字符语料库上，迭代地将高频的�
 
 [^1]: [Sun, F. (2012). *jieba Chinese segmentation*. GitHub](https://github.com/fxsjy/jieba)
 
-[^2]: **未登录词 (Out-of-Vocabulary, OOV)**: 指在模型的词典（Vocabulary）中没有收录的词。当模型在处理文本时遇到一个它在训练阶段从未见过的词时，这个词就是一个未登录词。这是传统基于词典的NLP方法面临的一大挑战，因为模型不知道如何处理这些词，常常导致错误的切分。
+[^2]: [Xue, N. (2003). *Chinese Word Segmentation as Character Tagging*. International Journal of Computational Linguistics & Chinese Language Processing, 8(1), 29-48](https://aclanthology.org/O03-4002/)
 
-[^3]: [Xue, N. (2003). *Chinese Word Segmentation as Character Tagging*. International Journal of Computational Linguistics & Chinese Language Processing, 8(1), 29-48](https://aclanthology.org/O03-4002/)
-
-[^4]: [Sennrich, R., Haddow, B., & Birch, A. (2016). *Neural Machine Translation of Rare Words with Subword Units*. arXiv:1508.07909](https://arxiv.org/abs/1508.07909)
+[^3]: [Sennrich, R., Haddow, B., & Birch, A. (2016). *Neural Machine Translation of Rare Words with Subword Units*. arXiv:1508.07909](https://arxiv.org/abs/1508.07909)
