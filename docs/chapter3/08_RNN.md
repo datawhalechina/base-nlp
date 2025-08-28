@@ -223,16 +223,16 @@ def pytorch_rnn_forward(x, U, W):
     return y, h_n.squeeze(0)
 ```
 
-### 4.5 `nn.RNN` 核心参数解析
+**`nn.RNN` 参数解析：**
 
-- `input_size` ($E$): 输入特征 $x_t$ 的维度。在NLP中，这通常是词嵌入的维度 `embedding_dim`。
-- `hidden_size` ($H$): 隐藏状态 $h_t$ 的维度。这代表了RNN“记忆”的容量，也是其隐藏层的节点数。
-- `num_layers`: RNN的层数。默认是1。如果大于1，会构成一个“堆叠RNN”（Stacked RNN），即前一层RNN在所有时间步的输出，会作为后一层RNN的输入。
-- `bias`: 是否使用偏置项。默认为 `True`。如果为真，则公式会变为 $h_t = \tanh(U x_t + b_{ih} + W h_{t-1} + b_{hh})$。在示例中设为 `False` 以便与手写版本对齐。
-- `batch_first`: 一个非常重要的维度顺序参数。默认为 `False`，此时输入张量的形状应为 `(T, B, E)`。在代码中设为 `True`，使得输入形状为更符合直觉的 `(B, T, E)`，其中 `B`是批次大小，`T`是序列长度。
-- `bidirectional`: 是否构建一个双向RNN。默认为 `False`。双向RNN能同时考虑过去和未来的上下文，后续章节将对此进行介绍。
+  - `input_size` ($E$): 输入特征 $x_t$ 的维度。在NLP中，这通常是词嵌入的维度 `embedding_dim`。
+  - `hidden_size` ($H$): 隐藏状态 $h_t$ 的维度。这代表了RNN“记忆”的容量，也是其隐藏层的节点数。
+  - `num_layers`: RNN的层数。默认是1。如果大于1，会构成一个“堆叠RNN”（Stacked RNN），即前一层RNN在所有时间步的输出，会作为后一层RNN的输入。
+  - `bias`: 是否使用偏置项。默认为 `True`。如果为真，则公式会变为 $h_t = \tanh(U x_t + b_{ih} + W h_{t-1} + b_{hh})$。在示例中设为 `False` 以便与手写版本对齐。
+  - `batch_first`: 一个非常重要的维度顺序参数。默认为 `False`，此时输入张量的形状应为 `(T, B, E)`。在代码中设为 `True`，使得输入形状为更符合直觉的 `(B, T, E)`，其中 `B`是批次大小，`T`是序列长度。
+  - `bidirectional`: 是否构建一个双向RNN。默认为 `False`。双向RNN能同时考虑过去和未来的上下文，后续章节将对此进行介绍。
 
-### 4.6 数值对齐验证
+### 4.5 数值对齐验证
 
 验证用 NumPy 手写的 RNN 和 PyTorch 官方的`nn.RNN`模块在给定相同输入和相同权重时，其输出是否完全相同。
 
