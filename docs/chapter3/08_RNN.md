@@ -263,13 +263,13 @@ $$
 
 主要的挑战在于计算单个时间步的梯度 $\frac{\partial L_t}{\partial W}$。由于 $W$ 在每个时间步都参与了计算，当前时刻的隐藏状态 $h_t$ 不仅依赖于当前输入 $x_t$，还通过 $h_{t-1}$ 间接依赖于之前所有时间步的输入和状态。因此，在 $t$ 时刻的损失，其梯度必须沿着时间反向传播，一直追溯到序列的开端。
 
-使用链式法则（向量-导数矩阵形式），$\frac{\partial L_t}{\partial W}$ 可分解为：
+使用链式法则（向量-导数矩阵形式）， $\frac{\partial L_t}{\partial W}$ 可分解为：
 
 $$
 \frac{\partial L_t}{\partial W} = \sum_{k=1}^{t} \underbrace{\frac{\partial L_t}{\partial h_t}}_{\text{梯度}} \cdot \underbrace{\frac{\partial h_t}{\partial h_k}}_{\text{导数矩阵连乘}} \cdot \underbrace{\frac{\partial h_k}{\partial W}}_{\text{直接影响}}
 $$
 
-其中，$\frac{\partial h_k}{\partial W}$ 是 $h_k$ 关于参数 $W$ 的导数矩阵；$\frac{\partial h_t}{\partial h_k}$ 表示从第 $k$ 步到第 $t$ 步的“传播的导数矩阵”，其本身是导数矩阵的连乘：
+其中， $\frac{\partial h_k}{\partial W}$ 是 $h_k$ 关于参数 $W$ 的导数矩阵； $\frac{\partial h_t}{\partial h_k}$ 表示从第 $k$ 步到第 $t$ 步的“传播的导数矩阵”，其本身是导数矩阵的连乘：
 
 $$
 \frac{\partial h_t}{\partial h_k} = \prod_{i=k+1}^{t} \frac{\partial h_i}{\partial h_{i-1}}
@@ -295,7 +295,7 @@ $$
 
 2.  **梯度爆炸 (Exploding Gradients)**：反之，如果 $W$ 的范数大于1，梯度值则会指数级增长，最终变成一个非常大的数值（Inf 或 NaN），导致模型训练崩溃。梯度爆炸问题相对容易发现和处理，一种常见的解决方法是**梯度裁剪（Gradient Clipping）**，即当梯度的范数超过某个阈值时，就将其缩放到该阈值。
 
-### 6.2 长距离依赖问题
+### 6.2 长距离依赖
 
 梯度消失在实践中比梯度爆炸更棘手，它直接导致了**长距离依赖问题（Long-term Dependency Problem）**。[^3]
 
