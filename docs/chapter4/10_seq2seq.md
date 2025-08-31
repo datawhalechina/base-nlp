@@ -205,8 +205,8 @@ Seq2Seq 架构借鉴了自编码器的结构，但对其核心目标进行了关
 >
 > 在朴素的自回归实现中，存在大量的重复计算。例如：
 > - **第1步**：输入 `<SOS>`，RNN 内部计算 $h^{\prime}_1 = f(h^{\prime}_0, y_0)$。
-> - **第2步**：输入 `<SOS>`, $y^{\prime}_1$，RNN 会**重新**计算 $h^{\prime}_1 = f(h^{\prime}_0, y_0)$，然后再计算 $h^{\prime}_2 = f(h^{\prime}_1, y^{\prime}_1)$。
-> - **第3步**：输入 `<SOS>`, $y^{\prime}_1$, $y^{\prime}_2$，RNN 会**再次重新**计算 $h^{\prime}_1$ 和 $h^{\prime}_2$，然后再计算 $h^{\prime}_3$。
+> - **第2步**：输入 `<SOS>, y^{\prime}_1$，RNN 会**重新**计算 $h^{\prime}_1 = f(h^{\prime}_0, y_0)$，然后再计算 $h^{\prime}_2 = f(h^{\prime}_1, y^{\prime}_1)$。
+> - **第3步**：输入 `<SOS>, y^{\prime}_1, y^{\prime}_2$，RNN 会**再次重新**计算 $h^{\prime}_1$ 和 $h^{\prime}_2$，然后再计算 $h^{\prime}_3$。
 >
 > 这种“从头算起”的方式效率极低。高效的实现方式是**缓存并利用上一个时间步的输出状态**：
 > 1.  在生成第 $t$ 个词元时，只将**第 $t-1$ 个词元** $y^{\prime}_{t-1}$ 和**上一步的隐藏状态** $h^{\prime}_{t-1}$ 作为RNN的输入。
@@ -273,7 +273,7 @@ class Encoder(nn.Module):
     -   `_, (hidden, cell) = self.rnn(embedded)`: 这是编码过程的核心。`self.rnn` 处理整个嵌入序列后，会返回两个内容：
         -   `outputs`: 包含了序列中**每一个时间步**的隐藏状态。对于编码器而言，中间步骤的输出通常不被使用，因此用 `_` 接收。
         -   `(hidden, cell)`: 一个元组，包含了整个序列**最后一个时间步**的隐藏状态和细胞状态。这正是我们需要的、概括了整个输入序列信息的**上下文向量**。
-    -   `return hidden, cell`: 函数最终返回这两个状态，作为上下文传递给解码器。
+    -   `return hidden, cell`: 函数最终返回这两个状态，作为上下文传递给解码器。这种实现方式对应了 `2.2` 节中描述的最经典的做法，即直接使用编码器最后一个时间步的状态作为上下文向量 $C$。
 
 #### 4.1.2 解码器 (Decoder)
 
@@ -314,7 +314,7 @@ class Decoder(nn.Module):
     -   `self.fc`: 增加了一个全连接层（`Linear`），它的作用是将 LSTM 输出的 `hidden_size` 维度的隐藏状态，映射到 `vocab_size` 维度的向量上。这个向量的每一个元素对应词汇表中一个词的得分（logit），后续可以通过 Softmax 函数转换为概率。
 
 2.  **`forward(self, x, hidden, cell)`**:
-    -   这是一个 **单步 (step-by-step)** 的前向传播函数，其输入 `x` 是一个形状为 `(batch_size,)` 的张量，仅包含当前时间步的词元ID。
+    -   这是一个**单步**的前向传播函数，其输入 `x` 是一个形状为 `(batch_size,)` 的张量，仅包含当前时间步的词元ID。
     -   `x = x.unsqueeze(1)`: 为了适应 `nn.Embedding` 和 `nn.LSTM` 对输入形状（需要有序列长度维度）的要求，需要给 `x` 增加一个长度为1的“伪序列”维度，使其形状变为 `(batch_size, 1)`。
     -   `embedded = self.embedding(x)`: 词元经过嵌入，形状变为 `(batch_size, 1, hidden_size)`。
     -   `outputs, (hidden, cell) = self.rnn(embedded, (hidden, cell))`: 解码器的 RNN 接收两个输入：当前步的嵌入向量 `embedded`，以及**上一步**传递过来的隐藏状态 `(hidden, cell)`。它只进行一步计算，然后返回当前步的输出 `outputs` 和更新后的状态 `(hidden, cell)`。
@@ -359,32 +359,32 @@ class Seq2Seq(nn.Module):
 
 **代码解析 (`forward`):**
 
-`forward` 函数模拟了训练过程中的一个批次计算：
+`forward` 函数接收源序列 `src` (形状 `(batch_size, src_len)`) 和目标序列 `trg` (形状 `(batch_size, trg_len)`)，并模拟了训练过程中的一个批次计算：
 
 1.  **初始化**:
-    -   `outputs = torch.zeros(...)`: 创建一个全零张量，用于存储解码器在每一个时间步的输出 logits。
-    -   `hidden, cell = self.encoder(src)`: 调用编码器，处理源序列 `src`，得到初始的上下文向量。
+    -   `outputs = torch.zeros(...)`: 创建一个形状为 `(batch_size, trg_len, vocab_size)` 的全零张量，用于存储解码器在每一个时间步的输出 logits。
+    -   `hidden, cell = self.encoder(src)`: 调用编码器处理源序列 `src`，得到初始的上下文向量。`hidden` 和 `cell` 的形状均为 `(num_layers, batch_size, hidden_size)`。
 
 2.  **启动解码**:
-    -   `input = trg[:, 0]`: 取出目标序列 `trg` 的第一个词元，这通常是 `<SOS>` 标志，作为解码器循环的起始输入。
+    -   `input = trg[:, 0]`: 取出目标序列 `trg` 的第一个词元（通常是 `<SOS>` 标志），作为解码器循环的起始输入。此时 `input` 的形状是 `(batch_size)`。
 
 3.  **循环解码**:
     -   `for t in range(1, trg_len)`: 循环从第二个词元（索引为1）开始，直到目标序列结束。
-    -   `output, hidden, cell = self.decoder(input, hidden, cell)`: 调用解码器执行单步计算，得到当前步的预测 `output` 和更新后的状态。
+    -   `output, hidden, cell = self.decoder(input, hidden, cell)`: 调用解码器执行单步计算。它接收形状为 `(batch_size)` 的 `input` 和上一时刻的状态，返回当前步的预测 `output` (形状 `(batch_size, vocab_size)`) 和更新后的状态。
     -   `outputs[:, t, :] = output`: 将当前步的预测存入 `outputs` 张量中。
 
 4.  **教师强制**:
     -   `teacher_force = random.random() < teacher_forcing_ratio`: 以一定的概率决定是否启用教师强制。
-    -   `top1 = output.argmax(1)`: 找出当前步预测概率最高的词元，作为“学生”自己的答案。
-    -   `input = trg[:, t] if teacher_force else top1`: 这是教师强制的核心。如果 `teacher_force` 为 `True`，则**无视模型的预测**，直接将**真实的下一个词元 `trg[:, t]`** 作为解码器下一步的输入（“老师”纠正）；否则，将模型自己的预测 `top1` 作为下一步的输入（“学生”自学）。
+    -   `top1 = output.argmax(1)`: 找出当前步预测概率最高的词元ID，得到形状为 `(batch_size)` 的张量 `top1`。
+    -   `input = trg[:, t] if teacher_force else top1`: 这是教师强制的核心。根据 `teacher_force` 的值，选择真实的下一个词元 `trg[:, t]` 或模型自己的预测 `top1` 作为下一步的输入。无论哪种情况，下一步的 `input` 形状都将是 `(batch_size)`。
 
-5.  **返回**: 最终返回包含了所有时间步预测的 `outputs` 张量，用于后续与真实标签计算损失。
+5.  **返回**: 最终返回 `outputs` 张量，其形状为 `(batch_size, trg_len, vocab_size)`，用于后续与真实标签计算损失。
 
 ### 4.2 模式详解：推理的高效与低效
 
 在推理时，模型必须工作在自回归模式下。如何实现自回归，直接关系到模型的推理效率。
 
-#### 4.2.1 低效实现：从头计算（教学对比用）
+#### 4.2.1 低效实现：从头计算
 
 一个常见的、但效率极低的错误是，在生成每个新词元时，都将**已生成的完整序列**重新喂给解码器。这会导致大量的重复计算。为了演示这一点，这里特意构建了一个 `DecoderForBadInference`，它的 `forward` 函数接收的是一个序列而不是单个词元。
 
