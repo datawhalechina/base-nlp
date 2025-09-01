@@ -139,11 +139,11 @@ class DecoderAlt(nn.Module):
 
 
 # ==============================================================================
-#   4. 解码策略演示
+#   4. 解码策略
 # ==============================================================================
 
 def alternative_greedy_decode(encoder, decoder, src, device, max_len=trg_len):
-    """配合 DecoderAlt 的贪心解码实现。"""
+    """配合 DecoderAlt 的解码实现。"""
     with torch.no_grad():
         hidden_ctx, cell_ctx = encoder(src)
         trg_indexes = [sos_idx]
