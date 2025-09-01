@@ -228,7 +228,7 @@ Seq2Seq 架构借鉴了自编码器的结构，但对其核心目标进行了关
 
 > [本节完整代码](https://github.com/FutureUnreal/base-nlp/blob/main/code/C4/01_Seq2Seq.py)
 
-### 4.1 核心组件：标准的 Encoder-Decoder
+### 4.1 标准的 Encoder-Decoder
 
 首先，来构建模型的基础骨架：编码器、解码器以及将它们组合在一起的 Seq2Seq 包装器。
 
@@ -370,107 +370,21 @@ class Seq2Seq(nn.Module):
     -   `teacher_force = random.random() < teacher_forcing_ratio`: 以一定的概率决定是否启用教师强制。
     -   `top1 = output.argmax(1)`: 找出当前步预测概率最高的词元ID，得到形状为 `(batch_size)` 的张量 `top1`。
     -   `input = trg[:, t] if teacher_force else top1`: 这是教师强制的关键。根据 `teacher_force` 的值，选择真实的下一个词元 `trg[:, t]` 或模型自己的预测 `top1` 作为下一步的输入。无论哪种情况，下一步的 `input` 形状都将是 `(batch_size)`。
-
+    
 5.  **返回**: 最终返回 `outputs` 张量，其形状为 `(batch_size, trg_len, vocab_size)`，用于后续与真实标签计算损失。
 
-### 4.2 模式详解：推理的高效与低效
+### 4.2 高效的推理实现
 
-在推理时，模型必须工作在自回归模式下。如何实现自回归，直接关系到模型的推理效率。
+在推理时，模型必须以自回归模式运行。一个最直观的实现方式是：在生成每个新词元时，都将**已生成的完整序列**重新喂给解码器。例如，生成第3个词时，将 `<SOS>, y'_1, y'_2` 作为解码器输入。
 
-#### 4.2.1 低效实现：从头计算
+这种方式虽然逻辑简单，但会导致严重的**重复计算**。RNN在处理 `y'_2` 时，会**重新**计算 `<SOS>` 和 `y'_1` 对应的隐藏状态，而这些状态在上一步其实已经计算过了。随着序列变长，这种浪费会越来越严重，导致推理效率极低。
 
-一个常见的、但效率极低的错误是，在生成每个新词元时，都将**已生成的完整序列**重新喂给解码器。这会导致大量的重复计算。为了演示这一点，这里特意构建了一个 `DecoderForBadInference`，它的 `forward` 函数接收的是一个序列而不是单个词元。
+正确的做法是利用 RNN 的“记忆”能力，**缓存并传递状态**，避免重复计算。我们设计的 `Decoder` 每次只处理一个时间步，正是为了支持这种高效模式。在推理时，只需将**上一步的输出词元**和**上一步的隐藏状态**传入解码器，进行单步计算，然后用返回的新状态覆盖旧状态即可。
 
-```python
-# 这是一个专门为演示错误而设计的解码器
-class DecoderForBadInference(nn.Module):
-    def __init__(self, vocab_size, hidden_size, num_layers):
-        super(DecoderForBadInference, self).__init__()
-        self.embedding = nn.Embedding(
-            num_embeddings=vocab_size,
-            embedding_dim=hidden_size
-        )
-        self.rnn = nn.LSTM(
-            input_size=hidden_size,
-            hidden_size=hidden_size,
-            num_layers=num_layers,
-            batch_first=True
-        )
-        self.fc = nn.Linear(in_features=hidden_size, out_features=vocab_size)
-
-    def forward(self, x, hidden, cell):
-        # x shape: (batch_size, current_seq_len)
-        embedded = self.embedding(x)
-        # 重新计算整个序列的RNN状态
-        outputs, _ = self.rnn(embedded, (hidden, cell))
-        # !! 关键缺陷：只取最后一个时间步的输出，前面的计算被浪费了
-        last_output = outputs[:, -1, :]
-        predictions = self.fc(last_output)
-        return predictions
-
-# 对应的低效推理循环
-def inefficient_greedy_decode(encoder, decoder, src, max_len=12, sos_idx=1):
-    with torch.no_grad():
-        hidden, cell = encoder(src)
-        trg_indexes = [sos_idx]
-        for i in range(max_len):
-            # !! 关键缺陷: 每次都把完整的 trg_indexes 作为输入
-            trg_tensor = torch.LongTensor([trg_indexes]).to(device)
-            # 打印输入形状，会看到它在不断变长: [1,1], [1,2], [1,3]...
-            print(f"第 {i+1} 步，解码器输入 shape: {trg_tensor.shape}")
-            output = decoder(trg_tensor, hidden, cell)
-            pred_token = output.argmax(1).item()
-            trg_indexes.append(pred_token)
-            if pred_token == eos_idx:
-                break
-    return trg_indexes
-```
-
-这段代码的低效根源在于**重复计算**：
-
-1.  **`DecoderForBadInference.forward`**:
-    -   它的输入 `x` 是一个不断增长的序列，如 `[<SOS>]`, `[<SOS>, w1]`, `[<SOS>, w1, w2]`...
-    -   `outputs, _ = self.rnn(embedded, (hidden, cell))`: 每次调用，RNN 都会**从头到尾**处理一遍当前输入的整个序列。例如，在计算第3个词时，它会重新计算第1、2个词对应的隐藏状态。
-    -   `last_output = outputs[:, -1, :]`: 计算完整个序列后，却只取**最后一个时间步**的输出来做预测，前面所有的计算结果都被**浪费**了。
-
-2.  **`inefficient_greedy_decode` 循环**:
-    -   `trg_tensor = torch.LongTensor([trg_indexes]).to(device)`: 这一行是“罪魁祸首”。在每次循环中，它都将 `trg_indexes` 这个**完整的、不断变长的列表**转换成张量，作为解码器的输入，从而触发了上述的重复计算。
-
-#### 4.2.2 高效实现：传递并更新状态（标准实践）
-
-正确的做法是利用 RNN 的“记忆”能力。只需将**上一步的输出词元**和**上一步的隐藏状态**传入解码器，进行单步计算，然后用返回的新状态覆盖旧状态即可。这个逻辑被封装在 `Seq2Seq` 类的 `greedy_decode` 方法中。
+`Seq2Seq` 类中高效的 `greedy_decode` 方法展示了这一过程：
 
 ```python
-class Seq2Seq(nn.Module):
-    def __init__(self, encoder, decoder, device):
-        super(Seq2Seq, self).__init__()
-        self.encoder = encoder
-        self.decoder = decoder
-        self.device = device
-
-    def forward(self, src, trg, teacher_forcing_ratio=0.5):
-        batch_size = src.shape[0]
-        trg_len = trg.shape[1]
-        trg_vocab_size = self.decoder.fc.out_features
-
-        outputs = torch.zeros(batch_size, trg_len, trg_vocab_size).to(self.device)
-        hidden, cell = self.encoder(src)
-
-        # 第一个输入是 <SOS>
-        input = trg[:, 0]
-
-        for t in range(1, trg_len):
-            output, hidden, cell = self.decoder(input, hidden, cell)
-            outputs[:, t, :] = output
-
-            # 决定是否使用 Teacher Forcing
-            teacher_force = random.random() < teacher_forcing_ratio
-            top1 = output.argmax(1)
-            # 如果 teacher_force，下一个输入是真实值；否则是模型的预测值
-            input = trg[:, t] if teacher_force else top1
-
-        return outputs
-
+# ... 在 Seq2Seq 类中 ...
     def greedy_decode(self, src, max_len=12, sos_idx=1, eos_idx=2):
         """推理模式下的高效贪心解码。"""
         self.eval()
@@ -480,7 +394,7 @@ class Seq2Seq(nn.Module):
             for _ in range(max_len):
                 # 1. 输入只有上一个时刻的词元
                 trg_tensor = torch.LongTensor([trg_indexes[-1]]).to(self.device)
-
+                
                 # 2. 解码一步，并传入上一步的状态
                 output, hidden, cell = self.decoder(trg_tensor, hidden, cell)
                 
@@ -492,17 +406,17 @@ class Seq2Seq(nn.Module):
         return trg_indexes
 ```
 
-这个高效的实现避免了任何重复计算，其核心在于**状态的传递与更新**：
+这避免了重复计算，其核心在于**状态的传递与更新**：
 
 1.  **`hidden, cell = self.encoder(src)`**: 在循环开始前，只调用一次编码器，获取初始上下文。
 2.  **循环内部**:
-    -   `trg_tensor = torch.LongTensor([trg_indexes[-1]]).to(self.device)`: 每次的输入**仅仅是上一步生成的最后一个词元** `trg_indexes[-1]`，而不是整个序列。这是一个形状为 `(1, 1)` 的张量。
+    -   `trg_tensor = torch.LongTensor([trg_indexes[-1]]).to(self.device)`: 每次的输入**仅仅是上一步生成的最后一个词元** `trg_indexes[-1]`，而不是整个序列。
     -   `output, hidden, cell = self.decoder(trg_tensor, hidden, cell)`: 将这个单词元输入和**上一步的 `hidden`, `cell` 状态**送入解码器。解码器只执行一步计算，并返回**新的 `hidden`, `cell` 状态**。
     -   这两个新状态会**覆盖**旧的状态变量，并在下一次循环中被用作输入。
 
 通过这种方式，信息流和状态在时间步之间平稳地传递，每个时间步都只进行一次必要的计算，极大地提升了推理效率。
 
-### 4.3 设计变体：上下文向量的另一种用法
+### 4.3 上下文向量的另一种用法
 
 除了将上下文向量用作解码器的初始状态外，还可以将其作为解码器**每个时间步的额外输入**。这种方式可以持续地为解码器提供全局信息。
 
