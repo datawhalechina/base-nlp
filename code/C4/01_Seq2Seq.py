@@ -163,7 +163,7 @@ def alternative_greedy_decode(encoder, decoder, src, device, max_len=trg_len):
 
 
 # ==============================================================================
-#   5. 演示主流程
+#   5. 主流程
 # ==============================================================================
 
 if __name__ == '__main__':
@@ -180,9 +180,9 @@ if __name__ == '__main__':
     trg = torch.randint(1, trg_vocab_size, (batch_size, trg_len)).to(device)
 
     # =========================================
-    # 演示1: 标准训练 & 高效推理
+    # 1: 标准训练 & 高效推理
     # =========================================
-    print("\n" + "="*25 + " 演示1: 标准模式 " + "="*25)
+    print("\n" + "="*25 + " 1: 标准模式 " + "="*25)
     # 训练过程模拟 (Teacher Forcing)
     model.train()
     outputs = model(src, trg, teacher_forcing_ratio=0.8)
@@ -192,9 +192,9 @@ if __name__ == '__main__':
     print(f"高效推理的预测结果: {prediction}")
 
     # =========================================
-    # 演示2: 上下文向量的另一种用法
+    # 2: 上下文向量的另一种用法
     # =========================================
-    print("\n" + "="*23 + " 演示2: 上下文变体用法 " + "="*23)
+    print("\n" + "="*23 + " 2: 上下文变体用法 " + "="*23)
     decoder_alt = DecoderAlt(trg_vocab_size, hidden_size, num_layers).to(device)
     
     prediction_alt = alternative_greedy_decode(encoder, decoder_alt, src[0:1, :], device)
