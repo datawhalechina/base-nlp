@@ -91,8 +91,8 @@ class Seq2Seq(nn.Module):
 
         encoder_outputs, hidden, cell = self.encoder(src)
         
-        hidden = hidden.view(self.encoder.rnn.num_layers, 2, batch_size, -1).sum(axis=1)
-        cell = cell.view(self.encoder.rnn.num_layers, 2, batch_size, -1).sum(axis=1)
+        hidden = hidden.view(self.encoder.rnn.num_layers, 2, batch_size, -1).sum(dim=1)
+        cell = cell.view(self.encoder.rnn.num_layers, 2, batch_size, -1).sum(dim=1)
 
         input = trg[:, 0]
         for t in range(1, trg_len):

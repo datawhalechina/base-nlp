@@ -152,7 +152,9 @@ $$
 - **键 (Key)**：可以看作是输入序列中各个信息片段的“标签”或“索引”，用于和查询进行匹配。在 Seq2Seq 中，输入序列的每个词元的隐藏状态 $h_j$ 都对应一个“键”。
 - **值 (Value)**：是与“键”对应的实际信息内容。在基础的注意力机制中，“键”和“值”通常是相同的，都来自于编码器的隐藏状态 $h_j$。
 
-具体计算过程，可以用一个凝练的数学公式来统一表达，这就是 **缩放点积注意力 (Scaled Dot-Product Attention)** ，它也是 Transformer 模型的核心组件之一：
+> 无论形式如何变化，注意力机制的本质都可以概括为：通过**查询 (Q)** 和一系列**键 (K)** 计算相关性（权重），然后利用这个权重，对与各个键对应的**值 (V)** 进行加权求和，得到最终的输出。
+
+具体计算过程，可以用一个凝练的数学公式来统一表达，这就是 **缩放点积注意力 (Scaled Dot-Product Attention)** ，它也是 Transformer 模型的核心组件之一[^2]：
 
 $$
 \text{Attention}(Q, K, V) = \text{softmax}\left(\frac{QK^T}{\sqrt{d_k}}\right)V
@@ -187,7 +189,7 @@ $$
 
 3.  **解码器 `Decoder`**：
     -   解码器的结构变化是最大的。它需要实例化一个 `Attention` 模块。
-    -   其 `forward` 函数必须**以循环的方式**，逐个时间步进行解码。这是因为在第 $t$ 步计算注意力时，需要依赖第 $t-1$ 步的解码器状态。这种时序依赖性决定了它无法像基础版 Seq2Seq 那样进行并行计算。在循环的每一步，它都会调用 `Attention` 模块计算上下文向量，并将其与当前词元的词嵌入融合后，再送入 RNN 单元。
+    -   其 `forward` 函数通常**以循环的方式**逐个时间步解码，因为在第 $t$ 步计算注意力时需要依赖第 $t-1$ 步的解码器状态。需要强调的是，RNN 解码本身就是按时间步顺序计算，不能在时间维度并行；Attention 并未改变这一点。相较于“整序列一次性送入 RNN”的写法，逐步解码更便于在每步显式计算注意力并灵活插入教师强制等策略。在循环的每一步，它都会调用 `Attention` 模块计算上下文向量，并将其与当前词元的词嵌入融合后，再送入 RNN 单元。
 
 ### 5.2 编码器 (Encoder)
 
@@ -219,8 +221,8 @@ class Encoder(nn.Module):
 
         return outputs, hidden, cell
 ```
-- **`bidirectional=True`**：启用双向 LSTM，使 `outputs` 维度变为 `(batch, src_len, hidden_size * 2)`。
-- **`self.fc`**：定义一个线性层，将拼接后的双向输出映射回 `hidden_size` 维度，方便后续计算。
+- **`bidirectional=True`**：启用双向 LSTM，使原始 RNN `outputs` 维度变为 `(batch, src_len, hidden_size * 2)`。
+- **`self.fc`**：定义一个线性层，将拼接后的双向输出映射回 `hidden_size` 维度；经过 `self.fc` 和 `tanh` 后，`outputs` 维度回到 `(batch, src_len, hidden_size)`，方便后续计算。
 - **`return outputs, ...`**：返回降维后的所有时间步输出 `outputs` (作为后续的 K 和 V)，以及原始的最终状态 `hidden` 和 `cell`。
 
 ### 5.3 注意力模块 (Attention) 的两种实现
@@ -261,7 +263,17 @@ class AttentionSimple(nn.Module):
 
 #### 带参数的注意力 (AttentionParams)
 
-这个版本引入了可学习的参数（一个线性层和一个向量 `v`），让模型可以自主学习如何更好地对齐 Query 和 Keys，即 Bahdanau 风格的注意力。
+这个版本引入了可学习的参数（一个线性层和一个向量 `v`），让模型可以自主学习如何更好地对齐 Query 和 Keys。从 QKV 的来源来看，由于查询（Query）来自解码器，而键（Key）和值（Value）来自编码器，因此这种机制本质上就是一种**交叉注意力 (Cross-Attention)**。
+
+> **“交叉”体现在哪里？**
+>
+> “交叉”一词形象说明了注意力计算的信息来源是**两个不同的序列**。
+>
+> - **查询 (Query)**：来自解码器序列的当前状态（例如 $h'_{t-1}$），代表了“我现在需要什么信息”。
+>
+> - **键 (Key) 和 值 (Value)**：来自编码器处理完**整个源序列**后产生的所有状态（例如 $h_1, h_2, \dots, h_{T_x}$），代表了“这里有全部的原始信息可供查询”。
+>
+> 信息从编码器序列流向解码器序列，两者通过注意力机制进行互动和对齐，因此被称为“交叉注意力”。与之相对的是自注意力 (Self-Attention)，其查询、键、值均来自同一个序列。
 
 ```python
 class AttentionParams(nn.Module):
@@ -358,8 +370,8 @@ class Seq2Seq(nn.Module):
         encoder_outputs, hidden, cell = self.encoder(src)
 
         # 适配Encoder(双向)和Decoder(单向)的状态维度
-        hidden = hidden.view(self.encoder.rnn.num_layers, 2, batch_size, -1).sum(axis=1)
-        cell = cell.view(self.encoder.rnn.num_layers, 2, batch_size, -1).sum(axis=1)
+        hidden = hidden.view(self.encoder.rnn.num_layers, 2, batch_size, -1).sum(dim=1)
+        cell = cell.view(self.encoder.rnn.num_layers, 2, batch_size, -1).sum(dim=1)
 
         input = trg[:, 0]
         for t in range(1, trg_len):
@@ -373,7 +385,7 @@ class Seq2Seq(nn.Module):
             
         return outputs
 ```
-- **状态适配**: 编码器是双向的，其 `hidden` 状态形状为 `(num_layers * 2, ...)`。解码器是单向的，需要 `(num_layers, ...)` 的初始状态。这里的 `hidden.view(...).sum(axis=1)` 通过 `view` 操作将状态拆分为 `(层数, 方向, ...)`，然后在方向维度上求和，巧妙地将双向状态合并为单向状态。
+- **状态适配**: 编码器是双向的，其 `hidden` 状态形状为 `(num_layers * 2, ...)`。解码器是单向的，需要 `(num_layers, ...)` 的初始状态。这里的 `hidden.view(...).sum(dim=1)` 通过 `view` 操作将状态拆分为 `(层数, 方向, ...)`，然后在方向维度上求和，巧妙地将双向状态合并为单向状态。
 - **循环解码**: 正如之前所强调的，Attention 机制下的解码必须是串行的。在 `for` 循环的每一步，都将 `encoder_outputs` 完整地传递给解码器，确保解码器在每个时间步都能基于上一时刻的状态，动态计算出当前最需要的上下文信息。
 
 这个实现完整地展示了 Attention 机制如何解决信息瓶颈问题：解码器不再只依赖于一个固定的上下文向量，而是在生成的每一步，都通过 Attention 模块动态地计算出一个与当前解码状态最相关的上下文向量，极大地提升了模型性能。
@@ -386,11 +398,11 @@ class Seq2Seq(nn.Module):
 
 -   **Soft Attention**：这就是前文一直在详细讨论的机制。它为输入序列的**所有**位置都计算一个注意力权重，这些权重是 0 到 1 之间的浮点数（经 Softmax 归一化），然后进行加权求和。这种方式的优点是模型是端到端可微的，可以使用标准的梯度下降法进行训练。其缺点是在处理非常长的序列时，计算开销会很大。因为解码的每一步，都需要计算当前状态与所有输入状态的相似度。
 
--   **Hard Attention**：与 Soft Attention 对所有输入进行加权不同，Hard Attention 在每一步只**选择一个**最相关的输入位置。可以看作是一种“非 0 即 1”的注意力分配，即选中的位置权重为 1，其他所有位置的权重均为 0。这样做的好处是计算量大大减少，因为不再需要进行全面的加权求和。但它的缺点也很突出：选择过程是离散的、不可微的，因此无法使用常规的反向传播算法进行训练，通常需要借助强化学习等更复杂的技巧。
+-   **Hard Attention**[^3]：与 Soft Attention 对所有输入进行加权不同，Hard Attention 在每一步只**选择一个**最相关的输入位置。可以看作是一种“非 0 即 1”的注意力分配，即选中的位置权重为 1，其他所有位置的权重均为 0。这样做的好处是计算量大大减少，因为不再需要进行全面的加权求和。但它的缺点也很突出：选择过程是离散的、不可微的，因此无法使用常规的反向传播算法进行训练，通常需要借助强化学习等更复杂的技巧。
 
 ### 6.2 Global Attention vs. Local Attention
 
-这是另一组从计算范围角度区分的概念，出自于另一篇开创性的论文[^2]。
+这是另一组从计算范围角度区分的概念，出自于另一篇开創性的论文[^4]。
 
 -   **Global Attention (全局注意力)**：其思想与 Soft Attention 基本一致，即在计算注意力时，会考虑编码器的**所有**隐藏状态。
 
@@ -400,8 +412,15 @@ class Seq2Seq(nn.Module):
     2.  **定义窗口**：以预测出的 $p_t$ 为中心，定义一个大小为 $2D+1$ 的窗口，其中 $D$ 是一个超参数。
     3.  **局部计算**：最后，模型只在这个窗口内的编码器状态上应用 Soft Attention 机制，计算权重并生成上下文向量。
 
-在当时，Local Attention 通过这种方式，在大幅降低计算复杂度的同时，依然保持了较好的性能。但随着 GPU 等计算资源的飞速发展，计算量已不再是主要瓶颈，因此目前最主流、应用最广泛的依然是 Soft / Global Attention。
+早期 Local Attention 通过局部窗口显著降低复杂度并保持良好性能。尽管硬件与内核优化推动了全局注意力在常规长度任务中的普及，但其 $O(N^2)$ 成本在长序列、低延迟或资源受限场景仍是瓶颈，因此局部/稀疏/窗口化/混合注意力在这些场景依然常用。
+
+---
 
 ## 参考文献
-[^1]: [Bahdanau, D., Cho, K., & Bengio, Y. (2014). *Neural machine translation by jointly learning to align and translate*. arXiv preprint arXiv:1490.0473.](https://arxiv.org/abs/1490.0473)
-[^2]: [Luong, M. T., Pham, H., & Manning, C. D. (2015). *Effective approaches to attention-based neural machine translation*. arXiv preprint arXiv:1508.04025.](https://arxiv.org/abs/1508.04025)
+[^1]: [Bahdanau, D., Cho, K., & Bengio, Y. (2014). *Neural machine translation by jointly learning to align and translate*. arXiv preprint arXiv:1409.0473.](https://arxiv.org/abs/1409.0473)
+
+[^2]: [Vaswani, A., Shazeer, N., Parmar, N., et al. (2017). *Attention Is All You Need*. NeurIPS 2017.](https://arxiv.org/abs/1706.03762)
+
+[^3]: [Xu, K., Ba, J., Kiros, R., Cho, K., Courville, A., Salakhudinov, R., ... & Bengio, Y. (2015). *Show, attend and tell: Neural image caption generation with visual attention*. arXiv preprint arXiv:1502.03044.](https://arxiv.org/abs/1502.03044)
+
+[^4]: [Luong, M. T., Pham, H., & Manning, C. D. (2015). *Effective approaches to attention-based neural machine translation*. arXiv preprint arXiv:1508.04025.](https://arxiv.org/abs/1508.04025)
