@@ -3,9 +3,9 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>All-in-RAG | 大模型应用开发实战：RAG技术全栈指南</title>
+    <title>深入浅出NLP</title>
     <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
-    <meta name="description" content="面向大模型应用开发者的RAG（检索增强生成）技术全栈教程，从零开始掌握RAG技术的核心原理与实际应用">
+    <meta name="description" content="一个面向自然语言处理（NLP）初学者的技术教程，内容涵盖NLP基础、词向量、循环神经网络、注意力机制、Transformer等核心概念与代码实践">
     <meta name="viewport"
         content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
     <link rel="stylesheet" href="//cdn.jsdelivr.net/npm/docsify@latest/lib/themes/vue.css">
@@ -117,8 +117,8 @@
     <script src="//cdn.jsdelivr.net/npm/mermaid@8.0.0-rc.8/dist/mermaid.min.js"></script>
     <script>
         window.$docsify = {
-            name: 'All-in-RAG',
-            repo: 'https://github.com/datawhalechina/all-in-rag',
+            name: '深入浅出NLP',
+            repo: 'https://github.com/datawhalechina/base-nlp',
             logo: './logo.svg',
             loadSidebar: true,
             auto2top: true,
@@ -161,10 +161,58 @@
             plugins: [
                 function(hook, vm) {
                     hook.beforeEach(function (html) {
-                        // 处理脚注语法 [^1] 和 [^1]: 定义
-                        html = html.replace(/\[\^([^\]]+)\]/g, '<sup><a href="#fn-$1" id="fnref-$1">$1</a></sup>');
-                        html = html.replace(/^\[\^([^\]]+)\]:\s*(.+)$/gm, '<div class="footnote" id="fn-$1"><p>$2 <a href="#fnref-$1">↩</a></p></div>');
+                        // 将 ```math ... ``` 或 ~~~math ... ~~~ 转换为 KaTeX 的 $$ ... $$ 块级公式
+                        try {
+                            html = html.replace(/```[ \t]*math[^\n]*\r?\n([\s\S]*?)```/g, function(_, content){ return '\n$$\n' + content + '\n$$\n'; });
+                            html = html.replace(/~~~[ \t]*math[^\n]*\r?\n([\s\S]*?)~~~/g, function(_, content){ return '\n$$\n' + content + '\n$$\n'; });
+                        } catch (e) { /* 忽略 */ }
+                        // 渲染前仅处理脚注“引用”，并避免匹配定义行 [^x]:
+                        html = html.replace(/\[\^([^\]]+)\](?!:)/g, '<sup class="footnote-ref"><a href="#fn-$1" data-footnote-ref="$1" id="fnref-$1">$1</a></sup>');
                         return html;
+                    });
+
+                    // 渲染后处理脚注“定义”，保留 Markdown 已生成的外链等 HTML
+                    hook.afterEach(function (html, next) {
+                        try {
+                            html = html.replace(/<p>\s*\[\^([^\]]+)\]:\s*([\s\S]*?)<\/p>/g, function(_, id, content) {
+                                return '<div class="footnote" id="fn-' + id + '"><p>' + content + ' <a href="#fnref-' + id + '">↩</a></p></div>';
+                            });
+                        } catch (e) { /* 忽略 */ }
+                        next(html);
+                    });
+
+                    hook.doneEach(function () {
+                        try {
+                            // 重新绑定点击事件，拦截脚注链接，平滑滚动到同页目标
+                            var prev = window.__footnoteContainer;
+                            var prevHandler = window.__footnoteHandler;
+                            if (prev && prevHandler) {
+                                prev.removeEventListener('click', prevHandler, true);
+                            }
+
+                            var container = document.querySelector('.markdown-section');
+                            if (!container) return;
+
+                            var handler = function (e) {
+                                var a = e.target && e.target.closest ? e.target.closest('a') : null;
+                                if (!a) return;
+                                var href = a.getAttribute('href') || '';
+                                if (!/^#(fn-|fnref-)/.test(href)) return;
+                                var targetId = href.slice(1);
+                                var el = document.getElementById(targetId);
+                                if (!el) return;
+                                e.preventDefault();
+                                e.stopPropagation();
+                                try { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+                                catch (_) { el.scrollIntoView(true); }
+                            };
+
+                            container.addEventListener('click', handler, true);
+                            window.__footnoteContainer = container;
+                            window.__footnoteHandler = handler;
+                        } catch (e) {
+                            // 忽略脚注绑定中的异常
+                        }
                     });
                 },
                 // 语言切换插件
@@ -229,6 +277,43 @@
 
                         // 监听路由变化
                         window.addEventListener('hashchange', updateSelector);
+                    });
+                },
+                // 重写原始 HTML <img> 的相对路径，使其与 docsify 的 Markdown 图片解析一致
+                function(hook, vm) {
+                    function getRouteDir() {
+                        var hash = decodeURIComponent(window.location.hash || '');
+                        if (!hash || hash === '#/' || hash === '#') return '';
+                        var path = hash.replace(/^#\//, '').replace(/(\?.*|#.*)/g, '');
+                        if (path && !path.endsWith('/')) {
+                            path = path.replace(/[^\/]*$/, '');
+                        }
+                        return path;
+                    }
+
+                    hook.doneEach(function() {
+                        try {
+                            var routeDir = getRouteDir();
+                            // location.pathname 例如: /all-in-rag/
+                            var base = window.location.origin + window.location.pathname + routeDir;
+                            var selector = '.markdown-section img:not([data-origin])';
+                            var imgs = document.querySelectorAll(selector);
+                            imgs.forEach(function(img) {
+                                var src = img.getAttribute('src');
+                                if (!src) return;
+                                // 跳过已是绝对路径或以 / 开头的路径
+                                if (/^(https?:)?\/\//i.test(src) || src.startsWith('/')) return;
+                                try {
+                                    // 利用 URL 自动规范化 ./ 和 ../
+                                    var abs = new URL(src, base).pathname;
+                                    img.setAttribute('src', abs);
+                                } catch (e) {
+                                    // 忽略单个元素的失败
+                                }
+                            });
+                        } catch (e) {
+                            // 忽略整体处理失败，避免影响页面其他功能
+                        }
                     });
                 }
             ]
