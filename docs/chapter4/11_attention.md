@@ -115,7 +115,7 @@ $$
 
 整个过程可以用下图来概括：
 
-![Attention 工作流程](./images/attention_Flow.svg)
+![Attention 工作流程](./images/11_3_2.svg)
 
 ### 3.3 一种高效的注意力打分函数
 
