@@ -284,7 +284,7 @@ class MultiHeadSelfAttention(nn.Module):
         $$
         \text{FFN}(x) = \text{ReLU}(xW_1 + b_1)W_2 + b_2
         $$
-        
+
         1.  第一次线性变换（$W_1$）通常会将输入维度 `d_model` 放大到 4 倍（`4 * d_model`）。这种**升维**操作旨在将特征投影到一个更高维的空间，以便提取更丰富、更复杂的模式。
         2.  使用一个激活函数（如 ReLU）进行非线性处理。
         3.  第二次线性变换（$W_2$）再将维度从 `4 * d_model` 压缩回原始的 `d_model`。这种**降维**操作可以看作是对高维特征的筛选和压缩，保留最重要的信息。
@@ -364,7 +364,7 @@ $$ \text{input\_embedding} = \text{token\_embedding} + \text{positional\_encodin
 
 2.  **基于三角函数的固定编码 (Sinusoidal Positional Encoding)**
     -   这是原版 Transformer 论文中使用的方法，它不需要学习。
-    -   它使用不同频率的正弦和余弦函数来为每个位置生成一个独特的、固定的编码向量：
+    -   使用不同频率的正弦和余弦函数来为每个位置生成一个独特的、固定的编码向量：
 
         $$
         PE_{(\text{pos}, 2i)} = \sin(\text{pos} / 10000^{2i/d_{\text{model}}}) \\
