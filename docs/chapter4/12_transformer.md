@@ -354,7 +354,7 @@ Transformer 的编码器由 $N$ 个（原论文中 $N=6$）刚刚定义的标准
 
 为了解决这个问题，Transformer 在将词嵌入向量输入模型之前，为它们加入了一个**位置编码 (Positional Encoding)** 向量。其工作方式非常直接：
 
-$$ \text{input\_embedding} = \text{token\_embedding} + \text{positional\_encoding} $$
+$$ input_\text{embedding} = token_\text{embedding} + positional_\text{encoding} $$
 
 这个额外注入的向量为每个词元提供了其在序列中的位置信息。这是一种**绝对位置编码**，即每个位置（如第 0、1、2 个位置）都有一个固定的编码向量。在实践中，主要有两种实现方式：
 
