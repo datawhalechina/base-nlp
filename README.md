@@ -73,7 +73,6 @@
 [![Contributors](https://contrib.rocks/image?repo=datawhalechina/base-nlp)](https://github.com/datawhalechina/base-nlp/graphs/contributors)
 
 ## 参与贡献
-
 - 发现问题请提交 Issue。
 
 ## Star History
