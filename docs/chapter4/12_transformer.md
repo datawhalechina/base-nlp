@@ -19,7 +19,7 @@
 在交叉注意力机制中，信息在两个不同的序列之间流动。通常，**Query** 来自解码器（代表当前的目标序列状态），而 **Key** 和 **Value** 来自编码器的所有输出（代表完整的源序列信息）。其目的是在生成目标序列的每一步时，从源序列中寻找最相关的信息。
 
 ```mermaid
-graph TD
+graph LR
     subgraph Encoder
         A[源序列] --> B[编码器输出 K, V];
     end
@@ -28,7 +28,7 @@ graph TD
     end
     subgraph "交叉注意力"
         D -- "查询" --> E{计算注意力权重};
-        B -- "匹配" --> E;
+        B -- "对齐" --> E;
         E --> F[上下文向量];
     end
     F --> C;
@@ -160,7 +160,6 @@ class SelfAttention(nn.Module):
         return context
 ```
 
-**代码解析**:
 - **`__init__`**: 初始化了三个 `nn.Linear` 层，它们分别对应将输入映射到 Q, K, V 空间的权重矩阵 $W^Q, W^K, W^V$。
 - **`forward`**:
     1.  `q_linear(x)`, `k_linear(x)`, `v_linear(x)`：将形状为 `[batch_size, seq_len, hidden_size]` 的输入张量 `x` 分别通过三个线性层，一次性地为序列中的所有词元计算出 Q, K, V 矩阵。
@@ -244,7 +243,6 @@ class MultiHeadSelfAttention(nn.Module):
         return output
 ```
 
-**代码解析**:
 - **`__init__`**:
     - `head_dim`：计算出每个头的维度，即 `hidden_size / num_heads`。
     - `q_linear, k_linear, v_linear`：与单头类似，但这里的线性层输出维度仍然是 `hidden_size`。这是为了**一次性计算出所有头所需的总特征**。

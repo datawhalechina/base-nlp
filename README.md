@@ -46,7 +46,7 @@
 ### 第一部分：理论篇
 - **第1章：NLP概述**
     - [x] [NLP简介](./docs/chapter1/01_nlp_intro.md)
-- **第2章：NLP常用技术**
+- **第2章：文本表示与词向量**
     - [x] [文本分词](./docs/chapter2/03_tokenization.md)
     - [x] [词向量](./docs/chapter2/04_word_vector.md)
     - [x] [Word2Vec](./docs/chapter2/05_Word2Vec.md)
@@ -61,7 +61,9 @@
 - **第5章：**
 
 ### 第二部分：实战篇
-*规划中*
+- **第1章：命名实体识别**
+    - [ ] []()
+- **第2章：**
 
 ### 第三部分：
 

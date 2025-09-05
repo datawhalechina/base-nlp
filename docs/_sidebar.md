@@ -1,6 +1,6 @@
 - **第1章：NLP概述**
     - [NLP简介](./chapter1/01_nlp_intro.md)
-- **第2章：NLP常用技术**
+- **第2章：文本表示与词向量**
     - [文本分词](./chapter2/03_tokenization.md)
     - [词向量](./chapter2/04_word_vector.md)
     - [Word2Vec](./chapter2/05_Word2Vec.md)
