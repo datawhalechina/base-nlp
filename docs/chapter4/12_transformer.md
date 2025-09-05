@@ -257,15 +257,17 @@ class MultiHeadSelfAttention(nn.Module):
         -   `.view(batch_size, seq_len, self.hidden_size)`: 最后，将 `num_heads` 和 `head_dim` 两个维度重新合并成 `hidden_size` 维度，完成了所有头输出的拼接。
     5.  **输出投影**: 将合并后的结果通过 `wo` 线性层，得到最终输出。
 
-## 三、Transformer 整体架构
+## 三、Transformer 整体结构
 
-理解了自注意力和多头注意力之后，就可以从一个更高的视角来审视 Transformer 的整体架构了。它依然是一个 Encoder-Decoder 结构，但其内部是由几个标准化的“积木”堆叠而成的。
+理解了自注意力和多头注意力之后，就可以从一个更高的视角来审视 Transformer 的整体结构了。它依然是一个 Encoder-Decoder 结构，但其内部是由几个标准化的“积木”堆叠而成的。
 
-![Transformer 架构](./images/12_3.png)
+<div align="center">
+    <img src="./images/12_3.png" alt="Transformer 架构" width="600">
+</div>
 
 ### 3.1 标准层架构
 
-无论是编码器还是解码器，它们的核心都是由 N 个完全相同的“层 (Layer)”堆叠而成。可以把每一层看作一个标准化的处理单元，这个单元由两个主要的子层 (Sub-layer) 构成：
+无论是编码器还是解码器，它们都是由 N 个完全相同的“层 (Layer)”堆叠而成。可以把每一层看作一个标准化的处理单元，这个单元由两个主要的子层 (Sub-layer) 构成：
 
 1.  **多头注意力层 (Multi-Head Attention Layer)**：
     -   **作用**：信息融合。负责执行注意力计算，让序列中的每个词元能够根据任务需要，从序列的其他部分（或另一个序列）中聚合信息。
