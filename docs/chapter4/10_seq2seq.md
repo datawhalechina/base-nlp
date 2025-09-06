@@ -139,7 +139,7 @@ Seq2Seq 架构借鉴了自编码器的结构，但对其核心目标进行了关
 
 1.  解码器在时间步 $t$ 的隐藏状态 $h^{\prime}_t$ 会经过一个全连接层（分类器），并使用 Softmax 函数计算出词汇表中每个词的概率，得到一个概率分布向量 $p_t$。模型的原始输出形状通常是 `(Batch Size, Sequence Length, Vocab Size)`。
 
-2.  损失函数（通常是**交叉熵损失 Cross-Entropy Loss**）会计算这个预测概率分布 $p_t$ 与真实目标 $y_t$ 之间的差异。以 PyTorch 为例，`CrossEntropyLoss` 接受形状为 `(N, C, ...)` 的输入，也可将 `(N, L, C)` 展平为 `(N·L, C)` 与目标 `(N·L)` 计算；若使用 `(N, C, L)` 形式，可通过 `permute` 将 `(N, L, C)` 交换至 `(N, C, L)`。[^3]
+2.  损失函数（通常是**交叉熵损失 Cross-Entropy Loss**）会计算这个预测概率分布 $p_t$ 与真实目标 $y_t$ 之间的差异。以 PyTorch 为例，`CrossEntropyLoss` 接受形状为 `(N, C, ...)` 的输入，也可将 `(N, L, C)` 展平为 `(N·L, C)` 与目标 `(N·L)` 计算；若使用 `(N, C, L)` 形式，可通过 `permute` 将 `(N, L, C)` 交换至 `(N, C, L)`。
 
 3.  训练时通常配合 `ignore_index` 忽略 `<PAD>` 位置的损失，从而避免填充对梯度的干扰。
 
@@ -180,7 +180,7 @@ Seq2Seq 架构借鉴了自编码器的结构，但对其核心目标进行了关
 1.  **收敛缓慢**：模型在训练初期预测不准，错误的预测会不断被喂给后续的步骤，导致误差累积，模型很难收敛。
 2.  **难以并行**：每个时间步的计算都依赖于上一步的结果，使得训练过程无法并行化，效率低下。
 
-为了解决这个问题，Seq2Seq 采用了一种名为 **教师强制 (Teacher Forcing)** [^4] 的高效训练策略。
+为了解决这个问题，Seq2Seq 采用了一种名为 **教师强制 (Teacher Forcing)** [^3] 的高效训练策略。
 
 在教师强制模式下，解码器在计算第 $t$ 步的输出时，其输入 **不再是自己上一时刻的预测值 $y^{\prime}_{t-1}$** ，而是直接使用 **数据集中真实的标签值 $y_{t-1}$** ——其构造方式正是在 `2.4.4` 节中描述的“解码器输入”序列。
 
@@ -504,6 +504,4 @@ Seq2Seq 架构的成功也揭示了其背后 Encoder-Decoder 框架的强大通�
 
 [^2]: [Cho, K., Van Merriënboer, B., Gulcehre, C., Bahdanau,D., Bougares, F., Schwenk, H., & Bengio, Y. (2014). *Learning phrase representations using RNN encoder-decoder for statistical machine translation*. Proceedings of the 2014 Conference on Empirical Methods in Natural Language Processing (EMNLP).](https://aclanthology.org/D14-1179/)
 
-[^3]: [PyTorch Documentation. *torch.nn.CrossEntropyLoss*.](https://pytorch.org/docs/stable/generated/torch.nn.CrossEntropyLoss.html)
-
-[^4]: [Bengio, S., Vinyals, O., Jaitly, N., & Shazeer, N. (2015). *Scheduled Sampling for Sequence Prediction with Recurrent Neural Networks*. Advances in Neural Information Processing Systems (NeurIPS).](https://proceedings.neurips.cc/paper/2015/hash/e995f98d56967d946471af29d7bf9a1e-Abstract.html)
+[^3]: [Bengio, S., Vinyals, O., Jaitly, N., & Shazeer, N. (2015). *Scheduled Sampling for Sequence Prediction with Recurrent Neural Networks*. Advances in Neural Information Processing Systems (NeurIPS).](https://proceedings.neurips.cc/paper/2015/hash/e995f98d56967d946471af29d7bf9a1e-Abstract.html)
