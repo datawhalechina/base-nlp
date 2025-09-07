@@ -58,7 +58,7 @@
     - [x] [Seq2Seq 架构](./docs/chapter4/10_seq2seq.md)
     - [x] [注意力机制](./docs/chapter4/11_attention.md)
     - [x] [深入解析Transformer](./docs/chapter4/12_transformer.md)
-- **第5章：预训练模型**
+- **第5章：语言模型**
     - [ ] [BERT](./docs/chapter5/13_Bert.md)
 
 ### 第二部分：实战篇
@@ -72,6 +72,12 @@
 
 **核心贡献者**
 - [尹大吕-项目负责人](https://github.com/FutureUnreal)（项目发起人与主要贡献者）
+
+### 特别感谢
+- 感谢 [@Sm1les](https://github.com/Sm1les) 对本项目的帮助与支持
+- 感谢所有为本项目做出贡献的开发者们
+- 感谢开源社区提供的优秀工具和框架支持
+- 特别感谢以下为教程做出贡献的开发者！
 
 [![Contributors](https://contrib.rocks/image?repo=datawhalechina/base-nlp)](https://github.com/datawhalechina/base-nlp/graphs/contributors)
 
