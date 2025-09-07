@@ -411,7 +411,7 @@ class Seq2Seq(nn.Module):
 
 -   **Global Attention (全局注意力)**：其思想与 Soft Attention 基本一致，即在计算注意力时，会考虑编码器的**所有**隐藏状态。
 
--   **Local Attention (局部注意力)**：这是一种介于 Soft Attention 和 Hard Attention 之间的折中方案。它旨在减少计算量，但又不像 Hard Attention 那样极端。其核心思想是，在每个解码时间步，只关注输入序列的一个**局部窗口**。
+-   **Local Attention (局部注意力)**：这是一种介于 Soft Attention 和 Hard Attention 之间的折中方案。能够减少计算量，但又不像 Hard Attention 那样极端。其核心思想是，在每个解码时间步，只关注输入序列的一个**局部窗口**。
     它的工作流程通常是：
     1.  **预测对齐位置**：首先，模型需要预测一个当前解码步最关注的源序列位置 $p_t$。这个位置可以通过一个小型神经网络，仅依赖于当前解码器状态 $h^\prime_t$ 来预测，从而避免了与所有编码器状态进行比较，降低了计算成本。预测公式可以设计为： $p_t = T_x \cdot \text{sigmoid}(W_p h'_t + b_p)$，其中 $T_x$ 是源序列长度， $W_p$ 和 $b_p$ 是可学习的参数。
     2.  **定义窗口**：以预测出的 $p_t$ 为中心，定义一个大小为 $2D+1$ 的窗口，其中 $D$ 是一个超参数。
