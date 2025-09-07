@@ -44,22 +44,22 @@
 ## 内容大纲
 
 ### 第一部分：理论篇
-- **第1章：NLP概述**
-    - [x] [NLP简介](./docs/chapter1/01_nlp_intro.md)
+- **第1章：NLP简介**
+    - [x] [NLP概述](./docs/chapter1/01_nlp_intro.md)
 - **第2章：文本表示与词向量**
-    - [x] [文本分词](./docs/chapter2/03_tokenization.md)
-    - [x] [词向量](./docs/chapter2/04_word_vector.md)
-    - [x] [Word2Vec](./docs/chapter2/05_Word2Vec.md)
-    - [x] [Gensim实战](./docs/chapter2/06_gensim.md)
+    - [x] [初级分词技术](./docs/chapter2/03_tokenization.md)
+    - [x] [词向量表示](./docs/chapter2/04_word_vector.md)
+    - [x] [从主题模型到Word2Vec](./docs/chapter2/05_Word2Vec.md)
+    - [x] [基于Gensim的词向量实战](./docs/chapter2/06_gensim.md)
 - **第3章：循环神经网络**
-    - [x] [RNN](./docs/chapter3/08_RNN.md)
-    - [x] [LSTM & GRU](./docs/chapter3/09_LSTM&GRU.md)
+    - [x] [循环神经网络](./docs/chapter3/08_RNN.md)
+    - [x] [LSTM 与 GRU](./docs/chapter3/09_LSTM&GRU.md)
 - **第4章：注意力机制与Transformer**
-    - [x] [Seq2Seq](./docs/chapter4/10_seq2seq.md)
-    - [x] [Attention](./docs/chapter4/11_attention.md)
-    - [x] [Transformer](./docs/chapter4/12_transformer.md)
-- **第5章：**
-    - [x] [Bert](./docs/chapter5/13_.md)
+    - [x] [Seq2Seq 架构](./docs/chapter4/10_seq2seq.md)
+    - [x] [注意力机制](./docs/chapter4/11_attention.md)
+    - [x] [深入解析Transformer](./docs/chapter4/12_transformer.md)
+- **第5章：预训练模型**
+    - [ ] [BERT](./docs/chapter5/13_Bert.md)
 
 ### 第二部分：实战篇
 - **第1章：命名实体识别**
@@ -74,6 +74,8 @@
 - [尹大吕-项目负责人](https://github.com/FutureUnreal)（项目发起人与主要贡献者）
 
 [![Contributors](https://contrib.rocks/image?repo=datawhalechina/base-nlp)](https://github.com/datawhalechina/base-nlp/graphs/contributors)
+
+*Made with [contrib.rocks](https://contrib.rocks).*
 
 ## 参与贡献
 - 发现问题请提交 Issue。
