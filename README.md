@@ -57,8 +57,9 @@
 - **第4章：注意力机制与Transformer**
     - [x] [Seq2Seq](./docs/chapter4/10_seq2seq.md)
     - [x] [Attention](./docs/chapter4/11_attention.md)
-    - [ ] [Transformer](./docs/chapter4/12_transformer.md)
+    - [x] [Transformer](./docs/chapter4/12_transformer.md)
 - **第5章：**
+    - [x] [Bert](./docs/chapter5/13_.md)
 
 ### 第二部分：实战篇
 - **第1章：命名实体识别**
