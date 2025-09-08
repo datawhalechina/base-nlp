@@ -71,7 +71,7 @@
 ## 致谢
 
 **核心贡献者**
-- [尹大吕-项目负责人](https://github.com/FutureUnreal)（项目发起人与主要贡献者）
+- [XXX-项目负责人](https://github.com/FutureUnreal)（项目发起人与主要贡献者）
 
 ### 特别感谢
 - 感谢 [@Sm1les](https://github.com/Sm1les) 对本项目的帮助与支持
