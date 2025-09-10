@@ -45,7 +45,7 @@
 
 ### 第一部分：理论篇
 - **第1章：NLP简介**
-    - [x] [NLP概述](./docs/chapter1/01_nlp_intro.md)
+    - [x] [NLP 概述](./docs/chapter1/01_nlp_intro.md)
 - **第2章：文本表示与词向量**
     - [x] [初级分词技术](./docs/chapter2/03_tokenization.md)
     - [x] [词向量表示](./docs/chapter2/04_word_vector.md)
@@ -59,7 +59,7 @@
     - [x] [注意力机制](./docs/chapter4/11_attention.md)
     - [x] [深入解析Transformer](./docs/chapter4/12_transformer.md)
 - **第5章：语言模型**
-    - [x] [BERT](./docs/chapter5/13_Bert.md)
+    - [x] [BERT 架构及应用](./docs/chapter5/13_Bert.md)
 
 ### 第二部分：实战篇
 - **第1章：命名实体识别**
