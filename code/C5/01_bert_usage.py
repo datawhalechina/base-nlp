@@ -13,6 +13,9 @@ tokenizer = AutoTokenizer.from_pretrained(model_name)
 model = AutoModel.from_pretrained(model_name).to(device)
 model.eval()
 
+print("\\n--- BERT 模型结构 ---")
+print(model)
+
 # 3. 文本预处理
 inputs = tokenizer(texts, padding=True, truncation=True, return_tensors="pt").to(device)
 

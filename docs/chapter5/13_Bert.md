@@ -224,6 +224,9 @@ tokenizer = AutoTokenizer.from_pretrained(model_name)
 model = AutoModel.from_pretrained(model_name).to(device)
 model.eval()
 
+print("\\n--- BERT 模型结构 ---")
+print(model)
+
 # 3. 文本预处理
 inputs = tokenizer(texts, padding=True, truncation=True, return_tensors="pt").to(device)
 
@@ -271,7 +274,82 @@ print(f"第一个句子的词元特征 shape: {first_sentence_tokens.shape}")
     -   **句子特征提取**: 通过索引 `[:, 0, :]`，可以轻松获得整个批次的 `[CLS]` 位置的隐藏状态；此外，`outputs.pooler_output`（若存在）是对该隐藏状态再经过一层全连接+Tanh 的结果（BERT 原用于 NSP 任务）。具体使用哪一种，建议以验证集效果为准，平均池化或拼接最后几层在实践中也常见。
     -   **词元特征提取**: 通过对特定范围进行切片可以获得具体某个句子的所有**非特殊词元**的特征向量。例如，对于第一个句子 "我来自中国"，Tokenizer 会将其转换为 `['[CLS]', '我', '来', '自', '中', '国', '[SEP]']`。因此，我们使用 `[0, 1:6, :]` 来提取索引从 1 到 5 的词元向量，这对应了 "我" 到 "国" 这五个汉字。这些特征可以用于命名实体识别等词元级任务。
 
-## 六、练习
+### 5.3 模型结构分解
+
+当运行 `print(model)` 时，会得到一个详细的、树状的 BERT 模型结构图，如下所示。
+
+```bash
+BertModel(
+  (embeddings): BertEmbeddings(
+    (word_embeddings): Embedding(21128, 768, padding_idx=0)
+    (position_embeddings): Embedding(512, 768)
+    (token_type_embeddings): Embedding(2, 768)
+    (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)
+    (dropout): Dropout(p=0.1, inplace=False)
+  )
+  (encoder): BertEncoder(
+    (layer): ModuleList(
+      (0-11): 12 x BertLayer(
+        (attention): BertAttention(
+          (self): BertSdpaSelfAttention(
+            (query): Linear(in_features=768, out_features=768, bias=True)
+            (key): Linear(in_features=768, out_features=768, bias=True)
+            (value): Linear(in_features=768, out_features=768, bias=True)
+            (dropout): Dropout(p=0.1, inplace=False)
+          )
+          (output): BertSelfOutput(
+            (dense): Linear(in_features=768, out_features=768, bias=True)
+            (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)
+            (dropout): Dropout(p=0.1, inplace=False)
+          )
+        )
+        (intermediate): BertIntermediate(
+          (dense): Linear(in_features=768, out_features=3072, bias=True)
+          (intermediate_act_fn): GELUActivation()
+        )
+        (output): BertOutput(
+          (dense): Linear(in_features=3072, out_features=768, bias=True)
+          (LayerNorm): LayerNorm((768,), eps=1e-12, elementwise_affine=True)
+          (dropout): Dropout(p=0.1, inplace=False)
+        )
+      )
+    )
+  )
+  (pooler): BertPooler(
+    (dense): Linear(in_features=768, out_features=768, bias=True)
+    (activation): Tanh()
+  )
+)
+```
+
+这为我们提供了一个直观的方式来理解其内部组件，并将其与理论知识对应起来。下面来结合这个结构，对 `bert--base-chinese` 模型的核心部分进行分解：
+
+1.  **`embeddings` (嵌入层)**: 此模块是上文 **BERT 输入表示** 理论的具体实现。它负责将输入的 token ID 序列，通过组合 **词元、位置和片段** 三种嵌入向量，转换为模型真正的输入。
+    *   `(word_embeddings): Embedding(21128, 768)`: **词元嵌入**。这里的 `21128` 是 `bert-base-chinese` 模型的词汇表大小，`768` 则是 BERT-Base 模型的隐藏层维度 H。
+    *   `(position_embeddings): Embedding(512, 768)`: **位置嵌入**。这正是在理论部分提到的**可学习的位置嵌入**，其 `[512, 768]` 的大小也直接解释了为什么 BERT-Base 模型的最大输入长度是 512 个词元。
+    *   `(token_type_embeddings): Embedding(2, 768)`: **片段嵌入**。它用于区分输入的两个不同句子（句子 A 和 B），这对于 NSP 这样的预训练任务至关重要。
+    *   `(LayerNorm)` 和 `(dropout)`: 在将上述三种嵌入向量相加后，会进行层归一化和 Dropout 操作，以稳定训练过程并增强模型的泛化能力。
+
+> 可以打开 [bert-base-chinese 的 `vocab.txt` 词汇表文件](https://huggingface.co/google-bert/bert-base-chinese/blob/main/vocab.txt) 验证一下。该文件共有 21128 行，每一行代表一个词元，词汇表大小正好是 `21128`。
+
+2.  **`encoder` (编码器)**: 这是 BERT 的核心主体，正是由前面提到的 **12 层 Transformer 编码器** 堆叠而成。
+    *   `(layer): ModuleList((0-11): 12 x BertLayer)`: `ModuleList` 中包含了 12 个完全相同的 `BertLayer`。模型的“深度”就体现在这里，每一层的输出都会作为下一层的输入，逐层提取更深层次的特征。
+    *   在每一个 `BertLayer` 内部，都包含了理论中所述的两个核心子层：
+        *   `(attention)`: **多头自注意力模块**。
+            *   其内部的 `query`, `key`, `value` 线性层负责将输入序列映射成 Q, K, V 矩阵。
+            *   `(output)` 中的 `dense` 层则对应注意力机制中的 $W^O$ 矩阵，负责将多头注意力的输出结果重新组合并进行线性变换。
+        *   `(intermediate)` 和 `(output)`: **位置前馈网络模块**。
+            *   `(intermediate)` 中的 `dense` 层将维度从 768 **升维** 到 3072。
+            *   `(output)` 中的 `dense` 层再将维度从 3072 **降维** 回 768。这个“先升维再降维”的结构，就是为了提取更丰富的特征，并让模型学习保留最重要的信息，与老师在课程中所讲完全一致。
+
+3.  **`pooler` (池化层)**:
+    *   此模块的功能与前面介绍的特殊词元 **`[CLS]`** 紧密相关。
+    *   它的作用是专门处理 `[CLS]` 词元在经过 12 层 Encoder 后的最终输出向量（即 `last_hidden_state[:, 0]`），通过一个全连接层和 `Tanh` 激活函数，将其转换为一个代表整个序列的“池化”后的特征向量。
+    *   这个经过特殊处理的 `[CLS]` 向量，在预训练阶段专门用于完成**下一句预测（NSP）**任务，从而使其学习到了整个输入序列的聚合信息。
+
+通过这个结构，可以清晰地看到 BERT 是如何将 Transformer 编码器的思想付诸实践的，从输入处理到多层特征提取，再到最终的输出，每一步都清晰可见。
+
+## 练习
 
 - 总结 BERT 和 Transformer(Encoder) 区别
 
