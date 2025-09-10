@@ -59,7 +59,7 @@
     - [x] [注意力机制](./docs/chapter4/11_attention.md)
     - [x] [深入解析Transformer](./docs/chapter4/12_transformer.md)
 - **第5章：语言模型**
-    - [ ] [BERT](./docs/chapter5/13_Bert.md)
+    - [x] [BERT](./docs/chapter5/13_Bert.md)
 
 ### 第二部分：实战篇
 - **第1章：命名实体识别**
