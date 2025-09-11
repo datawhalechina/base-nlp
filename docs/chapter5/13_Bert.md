@@ -326,7 +326,7 @@ BertModel(
 1.  **`embeddings` (嵌入层)**: 此模块是上文 **BERT 输入表示** 理论的具体实现。它负责将输入的 token ID 序列，通过组合 **词元、位置和片段** 三种嵌入向量，转换为模型真正的输入。
     *   `(word_embeddings): Embedding(21128, 768)`: **词元嵌入**。这里的 `21128` 是 `bert-base-chinese` 模型的词汇表大小，`768` 则是 BERT-Base 模型的隐藏层维度 H。
     *   `(position_embeddings): Embedding(512, 768)`: **位置嵌入**。这正是在理论部分提到的**可学习的位置嵌入**，其 `[512, 768]` 的大小也直接解释了为什么 BERT-Base 模型的最大输入长度是 512 个词元。
-    *   `(token_type_embeddings): Embedding(2, 768)`: **片段嵌入**。它用于区分输入的两个不同句子（句子 A 和 B），这对于 NSP 这样的预训练任务至关重要。
+    *   `(token_type_embeddings): Embedding(2, 768)`: **片段嵌入**。它用于区分输入的两个不同句子（句子 A 和 B），这对于 NSP 这样的预训练任务非常重要。
     *   `(LayerNorm)` 和 `(dropout)`: 在将上述三种嵌入向量相加后，会进行层归一化和 Dropout 操作，以稳定训练过程并增强模型的泛化能力。
 
     > 可以打开 [bert-base-chinese 的 `vocab.txt` 词汇表文件](https://huggingface.co/google-bert/bert-base-chinese/blob/main/vocab.txt) 验证一下。该文件共有 21128 行，每一行代表一个词元，词汇表大小正好是 `21128`。
