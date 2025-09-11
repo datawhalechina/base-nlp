@@ -1,6 +1,5 @@
 import numpy as np
 
-# 约定: (B, T, E, H) 分别表示 批次/序列长度/输入维度/隐藏维度
 B, E, H = 1, 128, 3
 
 def prepare_inputs():
