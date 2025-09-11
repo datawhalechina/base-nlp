@@ -329,7 +329,9 @@ BertModel(
     *   `(token_type_embeddings): Embedding(2, 768)`: **片段嵌入**。它用于区分输入的两个不同句子（句子 A 和 B），这对于 NSP 这样的预训练任务至关重要。
     *   `(LayerNorm)` 和 `(dropout)`: 在将上述三种嵌入向量相加后，会进行层归一化和 Dropout 操作，以稳定训练过程并增强模型的泛化能力。
 
-> 可以打开 [bert-base-chinese 的 `vocab.txt` 词汇表文件](https://huggingface.co/google-bert/bert-base-chinese/blob/main/vocab.txt) 验证一下。该文件共有 21128 行，每一行代表一个词元，词汇表大小正好是 `21128`。
+    > 可以打开 [bert-base-chinese 的 `vocab.txt` 词汇表文件](https://huggingface.co/google-bert/bert-base-chinese/blob/main/vocab.txt) 验证一下。该文件共有 21128 行，每一行代表一个词元，词汇表大小正好是 `21128`。
+
+    > 直接浏览器查看可能会导致浏览器卡死，别问笔者怎么知道的🫠
 
 2.  **`encoder` (编码器)**: 这是 BERT 的核心主体，正是由前面提到的 **12 层 Transformer 编码器** 堆叠而成。
     *   `(layer): ModuleList((0-11): 12 x BertLayer)`: `ModuleList` 中包含了 12 个完全相同的 `BertLayer`。模型的“深度”就体现在这里，每一层的输出都会作为下一层的输入，逐层提取更深层次的特征。
