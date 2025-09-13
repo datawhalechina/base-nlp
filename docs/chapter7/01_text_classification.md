@@ -131,7 +131,7 @@ plt.show()
 </div>
 
 **分析与结论**:
-- **文本长度长尾分布**：从 **图 1.1** 的文本长度分布直方图可以看出，大部分文本的长度集中在较短的区间，但存在少量长度非常长的“异常值”。这验证了直接截断可能会丢失过多信息，从而为我们后续选择**滑窗分割**策略提供了数据支持。
+- **文本长度长尾分布**：从 **图 1.1** 的文本长度分布直方图可以看出，大部分文本的长度集中在较短的区间，但存在少量长度非常长的“异常值”。这说明直接截断可能会丢失过多信息。
 - **词频齐夫定律**：如 **图 1.2** 的对数坐标图所示，词频分布呈现出典型的“长尾”现象：少数高频词（图左上角）占据了绝大多数的出现次数，而大量词汇（图中长长的“尾巴”）的出现频率极低。
 
 #### 3.2.3 Tokenizer 封装
@@ -209,9 +209,9 @@ print(f"过滤后的词典大小 (min_freq=5): {len(tokenizer)}")
 
 #### 3.2.6 封装 `Dataset` 和 `DataLoader`
 
-`TextClassificationDataset` 负责的核心逻辑是：接收原始文本，调用`tokenizer`进行ID化，并应用**滑窗分割**策略处理长文本。如果文本超过`max_len`，则会进行切分。代码中的 `stride` 被设置为 `max_len` 的四分之一，意味着每个文本块之间有25%的重叠，这有助于保持上下文信息的连续性。
+`TextClassificationDataset` 负责的核心逻辑是：接收原始文本，调用`tokenizer`进行ID化，并应用 **滑窗分割** 策略处理长文本。如果文本超过`max_len`，则会进行切分。代码中的 `stride` 被设置为 `max_len` 的四分之一，意味着每个文本块之间有25%的重叠，这有助于保持上下文信息的连续性。
 
-`collate_fn`函数则负责将一个批次内长短不一的样本，通过**填充**操作（使用 `<PAD>` 对应的ID，即`0`），打包成形状规整的张量，以便模型进行批处理。
+`collate_fn`函数则负责将一个批次内长短不一的样本，通过 **填充** 操作（使用 `<PAD>` 对应的ID，即`0`），打包成形状规整的张量，以便模型进行批处理。
 
 ```python
 import torch
@@ -273,7 +273,7 @@ valid_loader = DataLoader(valid_dataset, batch_size=32, collate_fn=collate_fn)
 
 #### 3.3.1 模型结构设计
 
-在编写模型代码前，先梳理清晰数据的“变形记”，即张量形状（Tensor Shape）在网络中如何变化：
+在编写模型代码前，先梳理清楚数据的“变形记”，即张量形状在网络中如何变化：
 
 ```
 Input:
@@ -289,7 +289,7 @@ nn.Embedding(padding_idx=0)
 nn.Linear(embed_dim, hidden_dim*2) -> nn.ReLU
      |
      V
-           [batch_size, seq_len, hidden_dim*2]
+ hidden_features: [batch_size, seq_len, hidden_dim*2]
      |
      V
 nn.Linear(hidden_dim*2, hidden_dim*4) -> nn.ReLU
@@ -361,6 +361,7 @@ class TextClassifier(nn.Module):
     def forward(self, token_ids):
         # token_ids: [batch_size, seq_len]
         embedded = self.embedding(token_ids) # -> [batch_size, seq_len, embed_dim]
+        hidden_features = self.feature_extractor(embedded) # -> [batch_size, seq_len, hidden_dim * 2]
         token_features = self.feature_extractor(embedded) # -> [batch_size, seq_len, hidden_dim * 4]
         
         padding_mask = (token_ids != self.embedding.padding_idx).float() # -> [batch_size, seq_len]
