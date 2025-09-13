@@ -35,7 +35,9 @@ graph LR
 
 这个流程是搭建深度学习应用的通用范式，是一套高度标准化、可复用的模板。理解并掌握这套流程，比单纯实现某个模型更为重要。在接下来的内容中，我们将按照这个流程，将各个模块封装成独立的类，构建一个更规范、更易于维护和扩展的项目。
 
-## 三、新闻文本分类
+## 三、新闻文本分类代码实践
+
+> [本节完整代码](https://github.com/datawhalechina/base-nlp/blob/main/code/C7/01_text_classification.ipynb)（[py版](https://github.com/datawhalechina/base-nlp/blob/main/code/C7/01_text_classification.py)）
 
 本节将使用 `scikit-learn` 库中的 `20 Newsgroups` 数据集，这是一个包含约20000篇新闻文档、近似均衡分布在20个不同新闻组（类别）的集合。
 
