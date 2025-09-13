@@ -14,4 +14,7 @@
     - [深入解析Transformer](./chapter4/12_transformer.md)
 
 - **第5章：预训练模型**
-    - [BERT](./chapter5/13_Bert.md)
+    - [BERT 架构及应用](./chapter5/13_Bert.md)
+
+- **第7章：应用实践**
+    - [文本分类](./chapter7/14_text_classification.md)
