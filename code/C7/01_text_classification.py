@@ -13,7 +13,6 @@ class Tokenizer:
     def __init__(self, vocab):
         self.vocab = vocab
         self.token_to_id = {token: idx for token, idx in self.vocab.items()}
-        self.id_to_token = {idx: token for token, idx in self.vocab.items()}
 
     @staticmethod
     def _tokenize_text(text):
@@ -205,11 +204,9 @@ class Predictor:
         chunk_tensors = torch.tensor(chunks, dtype=torch.long).to(self.device)
         with torch.no_grad():
             outputs = self.model(chunk_tensors)
-            probabilities = F.softmax(outputs, dim=1)
-            preds = torch.argmax(probabilities, dim=1)
+            preds = torch.argmax(outputs, dim=1)
 
-        vote_counts = Counter(preds.cpu().numpy())
-        final_pred_id = vote_counts.most_common(1)[0][0]
+        final_pred_id = torch.bincount(preds).argmax().item()
         
         final_pred_label = self.id_to_label[final_pred_id]
         return final_pred_label

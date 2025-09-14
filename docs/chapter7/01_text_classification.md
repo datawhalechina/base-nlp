@@ -138,7 +138,7 @@ plt.show()
 
 #### 3.2.3 Tokenizer 封装
 
-创建一个`Tokenizer`类，它将负责所有与分词、词典构建和ID转换相关的任务。其主要逻辑是：
+创建一个`Tokenizer`（分词器）类，它将负责所有与分词、词典构建和ID转换相关的任务。其主要逻辑是：
 
 - **分词策略**：`_tokenize_text` 方法实现了一套基于正则表达式的分词策略：先将文本转为小写；然后，通过 `re.sub` 移除非字母、数字和基本标点之外的字符；接着，为了确保标点符号能被作为独立的词元，在它们周围添加空格；最后，按空格切分文本，得到词元列表。
 - **词典构建**：遍历所有训练文本，统计词频，并过滤掉出现次数过少的低频词，以减少词典规模和噪声。同时，词典初始化时会预设两个特殊的Token：`<PAD>`（用于填充，ID为0）和`<UNK>`（用于表示未登录词，ID为1）。
@@ -152,7 +152,6 @@ class Tokenizer:
     def __init__(self, vocab):
         self.vocab = vocab
         self.token_to_id = {token: idx for token, idx in self.vocab.items()}
-        self.id_to_token = {idx: token for token, idx in self.vocab.items()}
 
     @staticmethod
     def _tokenize_text(text):
@@ -524,11 +523,9 @@ class Predictor:
         chunk_tensors = torch.tensor(chunks, dtype=torch.long).to(self.device)
         with torch.no_grad():
             outputs = self.model(chunk_tensors)
-            probabilities = F.softmax(outputs, dim=1)
-            preds = torch.argmax(probabilities, dim=1)
+            preds = torch.argmax(outputs, dim=1)
 
-        vote_counts = Counter(preds.cpu().numpy())
-        final_pred_id = vote_counts.most_common(1)[0][0]
+        final_pred_id = torch.bincount(preds).argmax().item()
         
         final_pred_label = self.id_to_label[final_pred_id]
         return final_pred_label
