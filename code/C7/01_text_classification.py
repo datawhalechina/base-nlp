@@ -7,19 +7,17 @@ from torch.utils.data import Dataset, DataLoader
 from sklearn.datasets import fetch_20newsgroups
 import os
 from tqdm import tqdm
-import matplotlib.pyplot as plt
 import json
 
 class Tokenizer:
-    def __init__(self, vocab, do_lower_case=True):
+    def __init__(self, vocab):
         self.vocab = vocab
         self.token_to_id = {token: idx for token, idx in self.vocab.items()}
         self.id_to_token = {idx: token for token, idx in self.vocab.items()}
-        self.do_lower_case = do_lower_case
 
-    def _tokenize_text(self, text):
-        if self.do_lower_case:
-            text = text.lower()
+    @staticmethod
+    def _tokenize_text(text):
+        text = text.lower()
         text = re.sub(r"[^a-z0-9(),.!?\\'`]", " ", text)
         text = re.sub(r"([,.!?\\'`])", r" \\1 ", text)
         tokens = text.strip().split()
@@ -52,7 +50,7 @@ class TextClassificationDataset(Dataset):
             if len(token_ids) <= self.max_len:
                 self.processed_data.append({"token_ids": token_ids, "label": label})
             else:
-                stride = self.max_len // 2
+                stride = max(1, int(self.max_len * 0.8))
                 for i in range(0, len(token_ids) - self.max_len + 1, stride):
                     chunk = token_ids[i:i+self.max_len]
                     self.processed_data.append({"token_ids": chunk, "label": label})
@@ -200,7 +198,7 @@ class Predictor:
         if len(token_ids) <= self.max_len:
             chunks.append(token_ids)
         else:
-            stride = self.max_len // 4
+            stride = max(1, int(self.max_len * 0.8))
             for i in range(0, len(token_ids) - self.max_len + 1, stride):
                 chunks.append(token_ids[i:i + self.max_len])
         
@@ -241,7 +239,7 @@ if __name__ == '__main__':
 
     print("\n--- 3. Tokenizer与词典构建 ---")
     vocab = build_vocab_from_counts(word_counts, min_freq=5)
-    tokenizer = Tokenizer(vocab, do_lower_case=True)
+    tokenizer = Tokenizer(vocab)
     print(f"过滤后的词典大小 (min_freq=5): {len(tokenizer)}")
     
     print("\n--- 4. 创建Dataset和DataLoader ---")

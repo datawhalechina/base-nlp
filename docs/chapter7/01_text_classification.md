@@ -149,11 +149,10 @@ from collections import Counter
 from tqdm import tqdm
 
 class Tokenizer:
-    def __init__(self, vocab, do_lower_case=True):
+    def __init__(self, vocab):
         self.vocab = vocab
         self.token_to_id = {token: idx for token, idx in self.vocab.items()}
         self.id_to_token = {idx: token for token, idx in self.vocab.items()}
-        self.do_lower_case = do_lower_case
 
     @staticmethod
     def _tokenize_text(text):
@@ -167,8 +166,6 @@ class Tokenizer:
         return [self.token_to_id.get(token, self.vocab["<UNK>"]) for token in tokens]
 
     def tokenize(self, text):
-        if self.do_lower_case:
-            text = text.lower()
         return self._tokenize_text(text)
     
     def __len__(self):
@@ -190,7 +187,7 @@ def build_vocab_from_counts(word_counts, min_freq=5):
 
 # 使用上一步计算出的word_counts来构建词典
 vocab = build_vocab_from_counts(word_counts, min_freq=5)
-tokenizer = Tokenizer(vocab, do_lower_case=True)
+tokenizer = Tokenizer(vocab)
 
 print(f"过滤后的词典大小 (min_freq=5): {len(tokenizer)}")
 ```
@@ -199,10 +196,10 @@ print(f"过滤后的词典大小 (min_freq=5): {len(tokenizer)}")
 
 在数据探索中能够发现，`20 Newsgroups`数据集中存在大量超长文本，有的甚至超过1万个词元。而大部分深度学习模型（尤其是非Transformer模型）都难以处理过长的序列，直接输入会导致内存溢出和计算效率低下。而简单的截断会丢失大量文本末尾的信息，可能会导致关键信息丢失。
 
-一个更好的方法是将一篇长文档切分成多个固定长度、且有部分重叠的“文本块”（Chunks）。例如，一篇1000词的文档，可以按`max_len=128`，`overlap=30`的方式切分。
+一个更好的方法是将一篇长文档切分成多个固定长度、且有部分重叠的“文本块”（Chunks）。例如，一篇1000词的文档，可以按`max_len=128`，`overlap=26`的方式切分。
 
 - 第一个块：`words[0:128]`
-- 第二个块：`words[98:226]` (128-30=98)
+- 第二个块：`words[102:230]` (128-26=102)
 - ...以此类推
 
 这样做有两大好处：
@@ -211,7 +208,7 @@ print(f"过滤后的词典大小 (min_freq=5): {len(tokenizer)}")
 
 #### 3.2.6 封装 `Dataset` 和 `DataLoader`
 
-`TextClassificationDataset` 负责的核心逻辑是：接收原始文本，调用`tokenizer`进行ID化，并应用 **滑窗分割** 策略处理长文本。如果文本超过`max_len`，则会进行切分。代码中的 `stride` 被设置为 `max_len` 的四分之一，意味着每个文本块之间有25%的重叠，这有助于保持上下文信息的连续性。
+`TextClassificationDataset` 负责的核心逻辑是：接收原始文本，调用`tokenizer`进行ID化，并应用 **滑窗分割** 策略处理长文本。如果文本超过`max_len`，则会进行切分。代码中的 `stride` 被设置为 `max_len` 的 80%，意味着每个文本块之间有20%的重叠，这有助于保持上下文信息的连续性。
 
 `collate_fn`函数则负责将一个批次内长短不一的样本，通过 **填充** 操作（使用 `<PAD>` 对应的ID，即`0`），打包成形状规整的张量，以便模型进行批处理。
 
@@ -233,7 +230,7 @@ class TextClassificationDataset(Dataset):
             if len(token_ids) <= self.max_len:
                 self.processed_data.append({"token_ids": token_ids, "label": label})
             else:
-                stride = self.max_len // 4
+                stride = max(1, int(self.max_len * 0.8))
                 for i in range(0, len(token_ids) - self.max_len + 1, stride):
                     chunk = token_ids[i:i+self.max_len]
                     self.processed_data.append({"token_ids": chunk, "label": label})
@@ -520,7 +517,7 @@ class Predictor:
         if len(token_ids) <= self.max_len:
             chunks.append(token_ids)
         else:
-            stride = self.max_len // 2
+            stride = max(1, int(self.max_len * 0.8))
             for i in range(0, len(token_ids) - self.max_len + 1, stride):
                 chunks.append(token_ids[i:i + self.max_len])
         
