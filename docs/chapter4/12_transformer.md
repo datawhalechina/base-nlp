@@ -262,7 +262,7 @@ class MultiHeadSelfAttention(nn.Module):
 理解了自注意力和多头注意力之后，就可以从一个更高的视角来审视 Transformer 的整体结构了。它依然是一个 Encoder-Decoder 架构，但其内部是由几个标准化的“积木”堆叠而成的。
 
 <div align="center">
-    <img src="./images/12_3.png" alt="Transformer 架构" width="600">
+    <img src="./images/12_3.svg" alt="Transformer 架构" width="600">
 </div>
 
 Transformer 的 Encoder 和 Decoder 都是由 N 个（原论文中 N=6）功能相同的层 (Layer) 堆叠而成。下面我们分别来看它们的内部构造。
@@ -276,7 +276,7 @@ Transformer 的 Encoder 和 Decoder 都是由 N 个（原论文中 N=6）功能�
 1.  **多头自注意力层 (Multi-Head Self-Attention Layer)**
 2.  **位置前馈网络 (Position-wise Feed-Forward Network)**
 
-每个子层的输出都经过了 **残差连接 (Add)** 与 **层归一化 (Norm)** 处理。因此，一个编码器层内部的数据流可以表示为：
+每个子层的输出都经过了 **残差连接 (Add)** 与 **层归一化 (Norm)** 处理（详见 3.3.2 节）。所以，一个编码器层内部的数据流可以表示为：
 
 `x -> Sublayer1(x) -> Add & Norm -> Sublayer2(...) -> Add & Norm`
 
@@ -289,7 +289,7 @@ Transformer 的 Encoder 和 Decoder 都是由 N 个（原论文中 N=6）功能�
 
 解码器的作用是基于编码器对原始输入的理解，并结合已经生成的部分，来逐个生成下一个词元。
 
-为了完成这个更复杂的任务，一个标准的**解码器层 (Decoder Layer)** 比编码器层多了一个注意力子层，总共包含**三个子层**：
+为了完成这个更复杂的任务，一个标准的 **解码器层 (Decoder Layer)** 比编码器层多了一个注意力子层，总共包含 **三个子层**：
 
 1.  **带掩码的多头自注意力层 (Masked Multi-Head Self-Attention Layer)**
 2.  **交叉注意力层 (Cross-Attention Layer)**
@@ -348,13 +348,13 @@ Transformer 的 Encoder 和 Decoder 都是由 N 个（原论文中 N=6）功能�
 
 ### 3.4 位置编码
 
-自注意力机制的主要缺陷在于其**位置无关性**。由于计算是完全并行的，模型无法感知词元的顺序。例如，“猫追狗”和“狗追猫”这两个句子，在自注意力看来，它们的词元集合完全相同，因此会为“猫”和“狗”生成相同的上下文表示，这显然是错误的。
+自注意力机制的主要缺陷在于其 **位置无关性**。由于计算是完全并行的，模型无法感知词元的顺序。例如，“猫追狗”和“狗追猫”这两个句子，在自注意力看来，它们的词元集合完全相同，因此会为“猫”和“狗”生成相同的上下文表示，这显然是错误的。
 
-为了解决这个问题，Transformer 在将词嵌入向量输入模型之前，为它们加入了一个**位置编码 (Positional Encoding)** 向量。其工作方式非常直接：
+为了解决这个问题，Transformer 在将词嵌入向量输入模型之前，为它们加入了一个 **位置编码 (Positional Encoding)** 向量。其工作方式非常直接：
 
 $$ input_\text{embedding} = token_\text{embedding} + positional_\text{encoding} $$
 
-这个额外注入的向量为每个词元提供了其在序列中的位置信息。这是一种**绝对位置编码**，即每个位置（如第 0、1、2 个位置）都有一个固定的编码向量。在实践中，主要有两种实现方式：
+这个额外注入的向量为每个词元提供了其在序列中的位置信息。这是一种 **绝对位置编码**，即每个位置（如第 0、1、2 个位置）都有一个固定的编码向量。在实践中，主要有两种实现方式：
 
 1.  **可学习的位置编码 (Learned Positional Encoding)**
     -   在 Encoder-only 模型（如 BERT）中常见；而近年的大型解码器式模型多采用相对/旋转类位置编码（如 RoPE[^4]）。

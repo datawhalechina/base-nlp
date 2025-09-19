@@ -77,7 +77,7 @@ import matplotlib.pyplot as plt
 import re
 
 # 为了进行探索，先定义一个简单的分词函数
-def basic_tokenize(text):
+def _tokenize_text(text):
     text = text.lower()
     text = re.sub(r"[^a-z0-9(),.!?\\'`]", " ", text)
     text = re.sub(r"([,.!?\\'`])", r" \\1 ", text)
@@ -85,7 +85,7 @@ def basic_tokenize(text):
     return tokens
 
 # 计算每篇文档的词元数量
-train_text_lengths = [len(basic_tokenize(text)) for text in train_dataset_raw.data]
+train_text_lengths = [len(_tokenize_text(text)) for text in train_dataset_raw.data]
 
 plt.figure(figsize=(10, 6))
 plt.hist(train_text_lengths, bins=50, alpha=0.7, color='blue')
@@ -110,7 +110,7 @@ import numpy as np
 # 计算所有词元的频率
 word_counts = Counter()
 for text in train_dataset_raw.data:
-    word_counts.update(basic_tokenize(text))
+    word_counts.update(_tokenize_text(text))
 
 # 获取频率并按降序排序
 frequencies = sorted(word_counts.values(), reverse=True)
@@ -138,7 +138,7 @@ plt.show()
 
 #### 3.2.3 Tokenizer 封装
 
-创建一个`Tokenizer`（分词器）类，它将负责所有与分词、词典构建和ID转换相关的任务。其主要逻辑是：
+创建一个`Tokenizer`（分词器）类，它将负责所有与分词、词典构建和ID转换相关的任务。它封装了与数据探索时相同的分词逻辑，并增加了ID转换等功能。其主要逻辑是：
 
 - **分词策略**：`_tokenize_text` 方法实现了一套基于正则表达式的分词策略：先将文本转为小写；然后，通过 `re.sub` 移除非字母、数字和基本标点之外的字符；接着，为了确保标点符号能被作为独立的词元，在它们周围添加空格；最后，按空格切分文本，得到词元列表。
 - **词典构建**：遍历所有训练文本，统计词频，并过滤掉出现次数过少的低频词，以减少词典规模和噪声。同时，词典初始化时会预设两个特殊的Token：`<PAD>`（用于填充，ID为0）和`<UNK>`（用于表示未登录词，ID为1）。
@@ -209,7 +209,7 @@ print(f"过滤后的词典大小 (min_freq=5): {len(tokenizer)}")
 
 `TextClassificationDataset` 负责的核心逻辑是：接收原始文本，调用`tokenizer`进行ID化，并应用 **滑窗分割** 策略处理长文本。如果文本超过`max_len`，则会进行切分。代码中的 `stride` 被设置为 `max_len` 的 80%，意味着每个文本块之间有20%的重叠，这有助于保持上下文信息的连续性。
 
-`collate_fn`函数则负责将一个批次内长短不一的样本，通过 **填充** 操作（使用 `<PAD>` 对应的ID，即`0`），打包成形状规整的张量，以便模型进行批处理。
+`collate_fn`函数则负责将一个批次内长短不一的样本，通过 **填充** 操作（使用 `<PAD>` 对应的ID `0`），打包成形状规整的张量，以便模型进行批处理。
 
 ```python
 import torch
