@@ -60,6 +60,7 @@
     - [x] [深入解析Transformer](./docs/chapter4/12_transformer.md)
 - **第5章：语言模型**
     - [x] [BERT 架构及应用](./docs/chapter5/13_Bert.md)
+    - [x] [GPT 架构及应用](./docs/chapter5/14_GPT.md)
 
 ### 第二部分：实战篇
 - **第1章：文本分类**

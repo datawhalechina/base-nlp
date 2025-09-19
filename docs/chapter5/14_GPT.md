@@ -149,7 +149,7 @@ print(f"\n中文最终生成结果 (出现乱码是正常现象): \n'{full_decod
 
 ```
 
-上面的代码通过并列对比 `gpt2` 模型处理英文和中文时的不同表现，可以得到两个关于预训练模型的结论：
+上面的代码通过并列对比 `gpt2` 模型处理英文和中文时的不同表现，可以得到两个关于原始 GPT2 预训练模型的结论：
 
 1.  **分词效率**：
     -   **英文**: 输入 `"I like eating fried"` 包含 4 个单词，被分词器高效地编码成了 4 个有意义的 token: `['I', 'Ġlike', 'Ġeating', 'Ġfried']` (带 `Ġ` 前缀表示一个词的开始)。
@@ -255,7 +255,7 @@ GPT2LMHeadModel(
 
 ### 4.4 使用 pipeline
 
-手动实现循环有助于理解原理，但在实际应用中，`transformers` 库提供了更高阶、更便捷的工具——`pipeline`。它将所有步骤（分词、模型调用、解码）封装在一起，一行代码即可完成文本生成。下面的示例将用 `pipeline` 快速复现前面的英文生成任务。
+手动实现循环有助于理解原理，但在实际应用中，`transformers` 库提供了更高阶、更便捷的工具——`pipeline`。它将所有步骤（分词、模型调用、解码）封装在一起，一行代码即可完成文本生成[^5]。下面的示例将用 `pipeline` 快速复现前面的英文生成任务。
 
 ```python
 # pipeline 应用
@@ -275,7 +275,7 @@ print(pipeline_outputs[0]['generated_text'])
 ## 参考文献
 
 [^1]: [Radford, A., Narasimhan, K., Salimans, T., & Sutskever, I. (2018). *Improving Language Understanding by Generative Pre-Training*.]
-(https://s3-us-west-2.amazonaws.com/openai-assets/research-covers/language-unsupervised/language_understanding_paper.pdf)
+(https://cdn.openai.com/research-covers/language-unsupervised/language_understanding_paper.pdf)
 
 [^2]: [Radford, A., Wu, J., Child, R., Luan, D., Amodei, D., & Sutskever, I. (2019). *Language Models are Unsupervised Multitask Learners*.]
 (https://cdn.openai.com/better-language-models/language_models_are_unsupervised_multitask_learners.pdf)
@@ -285,3 +285,6 @@ print(pipeline_outputs[0]['generated_text'])
 
 [^4]: [Sennrich, R., Haddow, B., & Birch, A. (2015). *Neural Machine Translation of Rare Words with Subword Units*.]
 (https://arxiv.org/abs/1508.07909)
+
+[^5]: [Hugging Face. GPT-2 tokenizer and model documentation.]
+(https://huggingface.co/docs/transformers/model_doc/gpt2)
