@@ -96,14 +96,21 @@ graph LR
 
 ### 4.2 查询语言：Cypher
 
-Neo4j 使用一种名为 **Cypher** 的声明式查询语言，它的语法设计得非常巧妙，通过“ASCII-Art”风格来描述图的模式，非常直观易懂。
+Cypher 是 Neo4j 的声明式图形查询语言，它的语法灵感来源于 SQL，但针对图的特性进行了优化。通过 Cypher，我们可以用一种直观且高效的方式来查询和操作图数据。
 
-例如，查询“所有参演了电影《黑客帝国》的演员”：
+例如，要查找在电影《黑客帝国》(The Matrix) 中出演过的所有演员，可以使用以下查询：
 
 ```cypher
 MATCH (actor:Person)-[:ACTED_IN]->(movie:Movie {title: 'The Matrix'})
 RETURN actor.name
 ```
+
+下图（图 1.1）是一份官方的 Cypher 语法速查表（[官方在线版本](https://neo4j.com/docs/cypher-refcard/4.4/)），其中汇总了常用的命令、操作符和语法结构，可供读者快速查阅。
+
+<div align="center">
+  <img src="images/8_4_2_1_cypher_refcard.png" alt="Cypher 语法速查表" width="60%" />
+  <p>图 1.1: Cypher 语法速查表 (Cypher Refcard)</p>
+</div>
 
 ### 4.3 安装与使用
 
@@ -114,18 +121,18 @@ RETURN actor.name
         1.  访问 [Neo4j 官网](https://neo4j.com/download/)，在 “Neo4j for Desktop” 板块点击 “Download” 按钮。
             <div align="center">
               <img src="images/8_4_3_1.png" alt="Neo4j Desktop 下载页面" width="60%" />
-              <p>图 4.1: 在官网点击下载</p>
+              <p>图 1.2: 在官网点击下载</p>
             </div>
         2.  页面会跳转至一个注册表单。可以填写任意信息，然后点击 “Download Desktop” 按钮，浏览器将自动开始下载安装包。
             <div align="center">
               <img src="images/8_4_3_2.png" alt="下载前填写表单" width="60%" />
-              <p>图 4.2: 填写注册表单</p>
+              <p>图 1.3: 填写注册表单</p>
             </div>
         3.  下载完成后，双击安装文件，程序会自动进行安装。
         4.  安装完成后首次启动，会看到许可协议界面，点击 “Continue” 即可完成最后的设置。
             <div align="center">
               <img src="images/8_4_3_3.png" alt="同意许可协议" width="60%" />
-              <p>图 4.3: 首次启动并同意许可协议</p>
+              <p>图 1.4: 首次启动并同意许可协议</p>
             </div>
 
 2.  **Docker (推荐用于服务器部署与跨平台开发)**
