@@ -3,7 +3,7 @@
 </div>
 
 <div align="center">
-  <h2>深入浅出NLP</h2>
+  <h2>从 NLP 到大模型</h2>
 </div>
 
 <div align="center">
