@@ -108,7 +108,7 @@ RETURN actor.name
 官方的 Cypher 语法速查表（[在线版本](https://neo4j.com/docs/cypher-refcard/4.4/)）汇总了常用的命令、操作符和语法结构，可供读者快速查阅。
 
 <div align="center">
-  <img src="images/8_4_2_1_cypher_refcard.png" alt="Cypher 语法速查表" width="60%" />
+  <img src="images/8_4_2_1.png" alt="Cypher 语法速查表" width="60%" />
   <p>图 1.1: Cypher 语法速查表 (Cypher Refcard)</p>
 </div>
 
