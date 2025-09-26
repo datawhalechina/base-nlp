@@ -104,7 +104,7 @@ RETURN actor.name
 官方的 Cypher 语法速查表（[在线版本](https://neo4j.com/docs/cypher-refcard/4.4/)）汇总了常用的命令、操作符和语法结构，可供读者快速查阅。
 
 <div align="center">
-  <img src="images/8_4_2_1.png" alt="Cypher 语法速查表" width="100%" />
+  <img src="images/1_4_2_1.png" alt="Cypher 语法速查表" width="100%" />
   <p>图 1.1: Cypher 语法速查表 (Cypher Refcard)</p>
 </div>
 
@@ -116,18 +116,18 @@ RETURN actor.name
     -   **安装**:
         1.  访问 [Neo4j 官网](https://neo4j.com/download/)，在 “Neo4j for Desktop” 板块点击 “Download” 按钮。
             <div align="center">
-              <img src="images/8_4_3_1.png" alt="Neo4j Desktop 下载页面" width="100%" />
+              <img src="images/1_4_3_1.png" alt="Neo4j Desktop 下载页面" width="100%" />
               <p>图 1.2: 在官网点击下载</p>
             </div>
         2.  页面会跳转至一个注册表单。可以填写任意信息，然后点击 “Download Desktop” 按钮，浏览器将自动开始下载安装包。
             <div align="center">
-              <img src="images/8_4_3_2.png" alt="下载前填写表单" width="100%" />
+              <img src="images/1_4_3_2.png" alt="下载前填写表单" width="100%" />
               <p>图 1.3: 填写注册表单</p>
             </div>
         3.  下载完成后，双击安装文件，程序会自动进行安装。
         4.  安装完成后首次启动，会看到许可协议界面，点击 “Continue” 即可完成最后的设置。
             <div align="center">
-              <img src="images/8_4_3_3.png" alt="同意许可协议" width="100%" />
+              <img src="images/1_4_3_3.png" alt="同意许可协议" width="100%" />
               <p>图 1.4: 首次启动并同意许可协议</p>
             </div>
 

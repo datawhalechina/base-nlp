@@ -97,7 +97,7 @@ plt.show()
 ```
 
 <div align="center">
-  <img src="images/7_3_2_1_1.png" alt="训练集文本长度分布" />
+  <img src="images/1_3_2_1_1.png" alt="训练集文本长度分布" />
   <p>图 1.1: 训练集文本长度分布</p>
 </div>
 
@@ -128,7 +128,7 @@ plt.show()
 ```
 
 <div align="center">
-  <img src="images/7_3_2_1_2.png" alt="词频-排名对数图" />
+  <img src="images/1_3_2_1_2.png" alt="词频-排名对数图" />
   <p>图 1.2: 词频-排名对数图</p>
 </div>
 
