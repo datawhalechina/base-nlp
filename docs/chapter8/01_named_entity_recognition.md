@@ -77,8 +77,6 @@
 
 ## 三、NER的数据标注
 
-> [本节相关代码](https://github.com/datawhalechina/base-nlp/tree/main/code/C8) (暂定)
-
 与大多数深度学习任务一样，NER 模型也需要“吃”大量的数据才能学到知识。
 
 ### 3.1 标注的重要性
