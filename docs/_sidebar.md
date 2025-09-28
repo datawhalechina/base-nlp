@@ -18,3 +18,6 @@
 
 - **第7章：应用实践**
     - [文本分类](./chapter7/14_text_classification.md)
+
+- **第8章：进阶主题**
+    - [命名实体识别](./chapter8/01_named_entity_recognition.md)
