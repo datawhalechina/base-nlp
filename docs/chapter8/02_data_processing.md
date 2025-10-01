@@ -4,24 +4,24 @@
 
 ## 一、数据处理流程总览
 
-在写代码之前，需要先明确整个数据处理流程的全貌并对数据结构进行拆解。
+在 NLP 中，原始的文本和标注数据是无法直接被神经网络模型利用的。需要将这些原始数据转换成模型能够理解的、标准化的数字张量。
 
-### 1.1 数据处理的主要任务
+### 1.1 明确数据处理的目标
 
-针对当前任务数据处理可以分解为以下几个关键问题：
+在设计之前，我们首先要明确最终的目标。对于一个命名实体识别任务，数据处理流水线需要产出什么？
 
-1. **模型的输入是什么？**
-   - **X**：`[batch_size, seq_len]` - 每个样本的 Token ID 序列
-   - **Y**：`[batch_size, seq_len]` - 每个 Token 对应的标签 ID
+1.  **模型的输入 (X) 是什么？**
+    -   它应该是一个整数张量，形状为 `[batch_size, seq_len]`。
+    -   其中 `batch_size` 是批次大小，`seq_len` 是序列长度（通常是批次内最长句子的长度）。
+    -   张量中的每一个数字，都代表原始句子中一个字符（Token）在词汇表里对应的唯一 ID。
 
-2. **如何从原始数据到模型输入？**
-   - 分词策略：按**字**切分（每个字就是一个 Token）
-   - Token 到 ID：需要构建词汇表
-   - 标签到 ID：需要构建标签映射表
+2.  **模型的标签 (Y) 是什么？**
+    -   它也应该是一个整数张量，形状与输入 X 完全相同，即 `[batch_size, seq_len]`。
+    -   其中的每一个数字，代表着对应位置字符的实体标签 ID（例如，`B-bod` 对应的 ID）。
 
-3. **输入输出的取值范围？**
-   - X 的取值：`[0, vocab_size)` - 词汇表大小
-   - Y 的取值：`[0, 1 + 4 × 实体数)` - 标签总数（`O` + `BMES` × 实体类型数）
+3.  **如何实现从“文本”到“ID”的转换？**
+    -   **文本 -> Token ID**：需要构建一个 “字符-ID” 的映射表，也就是**词汇表 (Vocabulary)**。
+    -   **实体 -> 标签 ID**：需要构建一个 “标签-ID” 的映射表。
 
 ### 1.2 数据格式解析
 
@@ -61,56 +61,34 @@
 
 ## 二、步骤一：构建标签映射体系
 
-> [完整代码](https://github.com/FutureUnreal/base-nlp/blob/main/code/C8/01_build_category.py)
-
-这是数据处理的第一步。我们需要从原始数据中提取所有实体类型，然后基于 `BMES` 标注方案构建完整的标签映射表。
+> **目标**：从原始数据中提取所有实体类型，然后基于 `BMES` 标注方案构建一个全局统一的“标签-ID”映射表。
+>
+> **对应脚本**：`code/C8/01_build_category.py`
 
 ### 2.1 设计思路
 
-在写代码之前，先明确**输入**和**输出**：
+在开始编码前，我们先梳理一下思路：
 
--   **输入**：原始数据文件路径列表（如 `['train.json', 'dev.json']`）
--   **核心逻辑**：遍历所有文件 → 提取实体类型 → 结合 `BMES` 生成映射
--   **输出**：`categories.json` 文件，存储标签到 ID 的映射关系
+1.  **输入**：一个或多个原始数据文件（`.json` 格式）。
+2.  **核心逻辑**：
+    *   我们需要一个函数，能够读取单个文件，并抽取出其中 `entities` 字段下所有的 `type` 值。
+    *   为了防止重复，使用 `set` 数据结构来收集这些实体类型。
+    *   遍历所有输入文件（训练集、验证集等），将所有实体类型汇总。
+    *   为了保证每次生成的 ID 映射都是固定的（这对于模型复现至关重要），需要对汇总后的实体类型进行**排序**。
+    *   创建一个字典，首先放入 `'O': 0` 作为非实体标签。然后遍历排序后的实体类型列表，为每一种类型生成 `B-`、`M-`、`E-`、`S-` 四种标签，并依次赋予递增的整数 ID。
+3.  **输出**：一个 `categories.json` 文件，以 JSON 格式存储最终的“标签-ID”映射字典。
 
-### 2.2 实现：从文件中提取实体类型
+### 2.2 核心代码实现
 
-第一步是编写一个函数，从单个数据文件中提取所有唯一的实体类型。
+根据以上思路，我们编写 `01_build_category.py` 脚本：
 
-```python
+```python:code/C8/01_build_category.py
 import json
-
-def get_entity_types_from_file(file_path):
-    """
-    从单个数据文件中提取所有唯一的实体类型。
-    """
-    entity_types = set()
-    with open(file_path, 'r', encoding='utf-8') as f:
-        for line in f:
-            try:
-                data = json.loads(line)
-                # 遍历实体列表，提取 'type' 字段
-                for entity in data.get('entities', []):
-                    entity_types.add(entity['type'])
-            except json.JSONDecodeError:
-                print(f"警告: 无法解析行: {line} in {file_path}")
-    return entity_types
-```
-
-**代码逻辑**：
-1. 使用 `set()` 自动去重
-2. 逐行读取文件（JSON Lines 格式）
-3. 解析每行的 JSON，提取 `entities` 中的 `type` 字段
-4. 用 `try-except` 处理可能的解析错误
-
-### 2.3 实现：构建标签映射字典
-
-接下来，处理**多个文件**，合并所有实体类型，并生成完整的标签映射。
-
-```python
 import os
+from collections import Counter
 
-def save_json(data, file_path):
+
+def save_json_pretty(data, file_path):
     """
     将 Python 对象以格式化的 JSON 形式保存到文件。
     """
@@ -119,74 +97,62 @@ def save_json(data, file_path):
         json.dump(data, f, ensure_ascii=False, indent=4)
 
 
-def build_label_map(data_files, output_file):
+def collect_entity_types_from_file(file_path):
+    """
+    从单个数据文件中提取所有唯一的实体类型。
+    """
+    types = set()
+    with open(file_path, 'r', encoding='utf-8') as f:
+        for line in f:
+            try:
+                data = json.loads(line)
+                # 遍历实体列表，提取 'type' 字段
+                for entity in data.get('entities', []):
+                    types.add(entity['type'])
+            except json.JSONDecodeError:
+                print(f"警告: 无法解析行: {line} in {file_path}")
+    return types
+
+
+def generate_tag_map(data_files, output_file):
     """
     从多个数据文件构建并保存一个完整的标签到ID的映射表。
     """
     # 1. 从所有提供的数据文件中提取所有唯一的实体类型
-    all_types = set()
+    all_entity_types = set()
     for file_path in data_files:
-        all_types.update(get_entity_types_from_file(file_path))
+        all_entity_types.update(collect_entity_types_from_file(file_path))
 
     # 排序以确保每次生成的映射表顺序一致
-    sorted_types = sorted(list(all_types))
-    print(f"从数据中发现的实体类型: {sorted_types}")
+    sorted_types = sorted(list(all_entity_types))
+    print(f"发现的实体类型: {sorted_types}")
 
     # 2. 基于BMES模式构建 label2id 映射字典
-    label2id = {'O': 0}  # 'O' 代表非实体 (Outside)
+    tag_to_id = {'O': 0}  # 'O' 代表非实体 (Outside)
     for entity_type in sorted_types:
         for prefix in ['B', 'M', 'E', 'S']:
-            label_name = f"{prefix}-{entity_type}"
-            label2id[label_name] = len(label2id)
+            tag_name = f"{prefix}-{entity_type}"
+            tag_to_id[tag_name] = len(tag_to_id)
 
-    print(f"\n已生成 {len(label2id)} 个标签的映射关系。")
+    print(f"\n已生成 {len(tag_to_id)} 个标签映射。")
 
     # 3. 将映射表保存到指定的输出文件
-    save_json(label2id, output_file)
-    print(f"标签映射表已保存至: {output_file}")
-```
+    save_json_pretty(tag_to_id, output_file)
+    print(f"标签映射已保存至: {output_file}")
 
-**代码要点**：
 
-1. **合并多个文件**：
-   - 使用 `set.update()` 合并所有文件的实体类型
-   - 确保训练集和验证集的标签都被包含
-
-2. **排序的重要性**：
-   - `sorted(list(all_types))` 保证每次运行的顺序一致
-   - 这对于模型的可复现性至关重要
-
-3. **构建映射**：
-   - 先初始化 `{'O': 0}`，为非实体标签预留 ID `0`
-   - 嵌套循环：外层遍历实体类型，内层遍历 `BMES` 前缀
-   - 巧妙利用 `len(label2id)` 实现 ID 自增
-
-4. **保存 JSON**：
-   - `ensure_ascii=False` 保证中文正常显示
-   - `indent=4` 格式化输出，便于阅读
-
-### 2.4 执行脚本
-
-```python
 if __name__ == '__main__':
     # 定义输入的数据文件和期望的输出路径
     train_file = './data/CMeEE-V2_train.json'
     dev_file = './data/CMeEE-V2_dev.json'
     output_path = './data/categories.json'
 
-    build_label_map(data_files=[train_file, dev_file], output_file=output_path)
+    generate_tag_map(data_files=[train_file, dev_file], output_file=output_path)
 ```
 
-**运行输出**：
+### 2.3 运行结果
 
-```
-从数据中发现的实体类型: ['bod', 'dep', 'dis', 'dru', 'equ', 'ite', 'mic', 'pro', 'sym']
-
-已生成 37 个标签的映射关系。
-标签映射表已保存至: ./data/categories.json
-```
-
-**生成的 `categories.json`（部分展示）**：
+执行此脚本后，会生成 `data/categories.json` 文件，内容如下（部分展示），完美符合我们的预期输出：
 
 ```json
 {
@@ -206,212 +172,291 @@ if __name__ == '__main__':
 }
 ```
 
-> **标签数量计算**
+## 三、步骤二：构建词汇表
+
+> **目标**：创建一个“字符-ID”的映射表（即词汇表），为后续将文本转换为数字序列做准备。
 >
-> 如果数据集中有 $N$ 种实体类型，则总标签数为：
->
-> $$\text{Total} = 1 + N \times 4$$
->
-> 其中 `1` 是非实体标签 `O`，`N × 4` 是每种实体类型的 `B/M/E/S` 标签。本例中 $N=9$，故总数为 $1 + 9 \times 4 = 37$。
+> **对应脚本**：`code/C8/02_build_vocabulary.py`
 
-## 三、步骤二：生成 Token 与标签序列
+### 3.1 设计思路
 
-> [完整代码](https://github.com/FutureUnreal/base-nlp/blob/main/code/C8/02_data_loader.py)
+1.  **问题分析**：
+    *   模型无法直接处理文本，需要将字符转换为数字 ID。
+    *   原始文本中可能包含语义相同但编码不同的字符，如全角字符（`Ａ`）和半角字符（`A`）。如果不统一，它们会被视为两个不同的 token，这会不必要地增加词汇表大小，并可能影响模型学习。
+2.  **核心逻辑**：
+    *   首先，需要一个**文本规范化**函数，将所有全角字符统一转换为半角。
+    *   遍历所有数据文件，读取每一行文本。
+    *   对每一行文本进行规范化处理。
+    *   使用 `collections.Counter` 来高效统计所有出现过的字符及其频率。
+    *   （可选）可以设置一个频率阈值 `min_freq` 来过滤掉低频或罕见的字符，以减小词汇表规模。
+    *   在最终的词汇表前，添加两个特殊的 token：`<PAD>`（用于后续填充）和 `<UNK>`（用于表示未登录词）。
+3.  **输出**：一个 `vocabulary.json` 文件，它是一个列表，存储了所有词汇（包括特殊 token）。
 
-有了标签映射表后，就可以开始处理原始文本了。这一步的目标是将文本按字切分，并为每个字生成对应的 `BMES` 标签。
+### 3.2 核心代码实现
 
-### 3.1 分词策略：按字切分
+```python:code/C8/02_build_vocabulary.py
+import json
+import os
+from collections import Counter
 
-在中文 NER 任务中，最直接有效的分词方式就是**按字切分**。
 
-```python
-text = "胃癌癌前病变和胃癌根治术后患者"
-tokens = list(text)
-```
-
-执行后，`tokens` 变成：
-
-```python
-['胃', '癌', '癌', '前', '病', '变', '和', '胃', '癌', '根', '治', '术', '后', '患', '者']
-```
-
-**为什么这样做？**
-- 避免传统分词工具可能将实体错误切分
-- Token 与原文字符位置完全对应，便于标签对齐
-- 与主流预训练模型（如 BERT）的中文处理方式一致
-
-### 3.2 核心逻辑：从实体标注生成 BMES 标签
-
-这是数据处理的核心步骤。根据实体的起止位置，为对应的 Token 分配正确的标签。
-
-```python
-def process_ner_data(file_path):
+def save_json_pretty(data, file_path):
     """
-    加载NER数据，处理第一行以生成BMES标签，
-    并打印结果用于验证。
+    将数据以易于阅读的格式保存为 JSON 文件。
     """
-    with open(file_path, 'r', encoding='utf-8') as f:
-        # 作为演示，我们只处理文件的第一行
-        first_line = f.readline()
-        if not first_line:
-            print("文件为空。")
-            return
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    with open(file_path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
 
-        data = json.loads(first_line)
 
-        # 1. 按字切分文本 (Tokenization)
-        text = data['text']
-        tokens = list(text)
+def normalize_text(text):
+    """
+    规范化文本，例如将全角字符转换为半角字符。
+    """
+    full_width = "０１２３４５６７８９ＡＢＣＤＥＦＧＨＩＪＫＬＭＮＯＰＱＲＳＴＵＶＷＸＹＺａｂｃｄｅｆｇｈｉｊｋｌｍｎｏｐｑｒｓｔｕｖｗｘｙｚ！＃＄％＆’（）＊＋，－．／：；＜＝＞？＠［＼］＾＿｀｛｜｝～＂"
+    half_width = r"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!#$%&'" + r'()*+,-./:;<=>?@[\]^_`{|}~".'
+    mapping = str.maketrans(full_width, half_width)
+    return text.translate(mapping)
 
-        # 2. 初始化标签列表，全部标记为 "O" (Outside)
-        labels = ['O'] * len(tokens)
 
-        # 3. 根据实体标注信息，应用 BMES 标签
-        for entity in data.get('entities', []):
-            entity_type = entity['type']
-            start_idx = entity['start_idx']
-            # 注意：原始end_idx不包含，我们将其-1转换为包含模式，便于处理
-            end_idx = entity['end_idx'] - 1
-            entity_len = end_idx - start_idx + 1
+def create_char_vocab(data_files, output_file, min_freq=1):
+    """
+    从数据文件创建字符级词汇表。
+    """
+    char_counts = Counter()
+    for file_path in data_files:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                try:
+                    data = json.loads(line)
+                    text = normalize_text(data['text'])
+                    char_counts.update(list(text))
+                except (json.JSONDecodeError, KeyError):
+                    print(f"警告: 无法处理行: {line} in {file_path}")
 
-            if entity_len == 1:
-                # 单字实体
-                labels[start_idx] = f'S-{entity_type}'
-            else:
-                # 多字实体
-                labels[start_idx] = f'B-{entity_type}'
-                labels[end_idx] = f'E-{entity_type}'
-                for i in range(start_idx + 1, end_idx):
-                    labels[i] = f'M-{entity_type}'
+    # 过滤低频词
+    frequent_chars = [char for char, count in char_counts.items() if count >= min_freq]
+    
+    # 保证每次生成结果一致
+    frequent_chars.sort()
 
-        # 4. 打印Token和对应的标签，用于检查逻辑正确性
-        print("文本Tokens及其生成的BMES标签:")
-        for token, label in zip(tokens, labels):
-            print(f"{token}\t{label}")
-```
+    # 添加特殊标记
+    special_tokens = ["<PAD>", "<UNK>"]
+    final_vocab_list = special_tokens + frequent_chars
+    
+    print(f"词汇表大小 (min_freq={min_freq}): {len(final_vocab_list)}")
 
-**代码逻辑详解**：
+    # 保存词汇表
+    save_json_pretty(final_vocab_list, output_file)
+    print(f"词汇表已保存至: {output_file}")
 
-1. **初始化标签序列**：
-   ```python
-   labels = ['O'] * len(tokens)
-   ```
-   创建与 Token 序列等长的列表，默认全部为 `'O'`（非实体）
 
-2. **遍历实体标注**：
-   ```python
-   for entity in data.get('entities', []):
-   ```
-   处理每个标注的实体
-
-3. **计算实体长度**：
-   ```python
-   # 注意：原始end_idx不包含，我们将其-1转换为包含模式，便于处理
-   end_idx = entity['end_idx'] - 1
-   entity_len = end_idx - start_idx + 1
-   ```
-   我们将不包含的 `end_idx` 减 1，使其变为实体最后一个字符的索引（即包含模式），这样实体长度就可以统一用 `end - start + 1` 计算。
-
-4. **应用 BMES 标签**：
-   - **单字实体**（`entity_len == 1`）：
-     ```python
-     labels[start_idx] = f'S-{entity_type}'
-     ```
-   - **多字实体**（`entity_len > 1`）：
-     ```python
-     labels[start_idx] = f'B-{entity_type}'  # Begin
-     labels[end_idx] = f'E-{entity_type}'      # End (使用转换后的end_idx)
-     for i in range(start_idx + 1, end_idx):
-         labels[i] = f'M-{entity_type}'      # Middle
-     ```
-
-### 3.3 执行效果
-
-```python
 if __name__ == '__main__':
     train_file = './data/CMeEE-V2_train.json'
-    print(f"--- 正在处理文件的第一行: {train_file} ---")
-    process_ner_data(train_file)
+    dev_file = './data/CMeEE-V2_dev.json'
+    output_path = './data/vocabulary.json'
+
+    # 设置字符最低频率，1表示包含所有出现过的字符
+    create_char_vocab(data_files=[train_file, dev_file], output_file=output_path, min_freq=1)
 ```
 
-**运行输出示例**（部分）：
+### 3.3 运行结果
 
-```
---- 正在处理文件的第一行: ./data/CMeEE-V2_train.json ---
-文本Tokens及其生成的BMES标签:
-胃	B-dis
-癌	M-dis
-癌	M-dis
-前	M-dis
-病	M-dis
-变	E-dis
-和	O
-胃	B-pro
-癌	M-pro
-根	M-pro
-治	M-pro
-术	E-pro
-后	O
-患	O
-者	O
+执行后，会生成 `data/vocabulary.json` 文件，它是一个列表，索引 `0` 和 `1` 分别是 `<PAD>` 和 `<UNK>`：
+
+```json
+[
+    "<PAD>",
+    "<UNK>",
+    " ",
+    "!",
+    ...
+]
 ```
 
-**结果验证**：
-- "胃癌癌前病变"（`dis` 疾病）：`B-dis`, `M-dis`, `M-dis`, `M-dis`, `M-dis`, `E-dis`
-- "胃癌根治术"（`pro` 诊疗程序）：`B-pro`, `M-pro`, `M-pro`, `M-pro`, `E-pro`
-- 其他字符：`O`
+## 四、步骤三：封装数据加载器
 
-至此，我们成功地将原始的实体标注转换成了与 Token 一一对应的 `BMES` 标签序列！
-
-## 四、后续步骤预告
-
-当前我们已经完成了数据处理的两个核心步骤：
-
-1. ✅ 构建标签映射体系（`categories.json`）
-2. ✅ 生成 Token 与标签序列
-
-接下来的工作包括：
-
-### 4.1 步骤三：转换为 ID 序列
-
-将 Token 序列和标签序列转换为模型可用的整数 ID：
-
--   **Token → ID**：需要构建词汇表（或使用 BERT tokenizer）
--   **Label → ID**：加载 `categories.json` 映射表
-
-### 4.2 步骤四：构建 DataLoader
-
-封装成 PyTorch 的 `Dataset` 和 `DataLoader`：
-- 实现批处理（Batch Processing）
-- 实现填充（Padding）
-- 实现数据增强等
-
-### 4.3 步骤五：模型构建与训练
-
-基于处理好的数据，构建 NER 模型并进行训练。
-
-## 五、关键要点总结
-
-本节通过流程化的方式，完成了 NER 数据处理的前两个关键步骤：
-
-1. **标签映射构建**（`01_build_category.py`）：
-   - 扫描所有数据文件，提取唯一的实体类型
-   - 通过排序确保映射关系的固定性和可复现性
-   - 结合 `BMES` 方案生成完整的标签到 ID 映射表
-
-2. **Token 与标签生成**（`02_data_loader.py`）：
-   - 采用按字切分策略，确保边界精确
-   - 根据实体起止位置，精确分配 `BMES` 标签
-   - 正确处理单字实体和多字实体的不同情况
-
-3. **流程化代码组织**：
-   - 每个脚本专注于一个明确的任务
-   - 先想清楚输入输出，再动手写代码
-   - 通过打印验证每一步的正确性
-
-> **核心思想**
+> **目标**：利用前两步生成的映射文件，将原始数据彻底转换为模型可用的、批次化的 PyTorch Tensor。
 >
-> 写代码的本质是：明确**输入** → 设计**转换逻辑** → 得到**输出**。将复杂任务拆解成独立的小步骤，逐一实现并验证，最终组合成完整的流程。
+> **对应脚本**：`code/C8/03_data_loader.py`
+
+### 4.1 设计思路
+
+1.  **问题分析**：
+    *   我们现在有了原始数据、词汇表和标签映射，如何将它们高效地整合起来？
+    *   模型训练时需要以“批次”（batch）为单位输入数据，而不是单条数据。
+    *   同一批次内的文本长度往往不同，但输入模型的 Tensor 必须是规整的矩形，如何处理不等长序列？
+2.  **核心逻辑（采用 PyTorch 标准实践）**：
+    *   **`Vocabulary` 类**：创建一个类来封装词汇表加载和“token-ID”转换的逻辑，使其清晰、可复用。
+    *   **`NerDataProcessor` (Dataset) 类**：这是数据处理的核心。它继承 PyTorch 的 `Dataset`，负责：
+        *   在 `__init__` 中加载所有原始数据记录。
+        *   在 `__getitem__` 中处理**单条**数据：将文本转换为 `token_ids`，并根据实体标注生成 `tag_ids`。
+    *   **`create_ner_dataloader` 工厂函数**：这个函数封装了创建 `DataLoader` 的全部逻辑，包括一个非常关键的内部函数 `collate_batch`。
+    *   **`collate_batch` 函数**：它负责解决不等长序列的问题。其工作原理是：
+        *   接收一个批次的数据（一个由 `__getitem__` 返回的字典组成的列表）。
+        *   找到当前批次中最长的序列长度。
+        *   使用 `pad_sequence` 函数，将所有序列都填充（pad）到这个最大长度。对于 `token_ids` 使用 `pad_id` (通常是0)，对于 `tag_ids` 使用 `-100`（PyTorch 损失函数会忽略这个值）。
+        *   生成一个 `attention_mask`，标记出哪些是真实 token（值为1），哪些是填充 token（值为0），以便模型在计算时忽略填充部分。
+
+### 4.2 核心代码实现
+
+```python:code/C8/03_data_loader.py
+import json
+import torch
+from torch.utils.data import Dataset, DataLoader
+from torch.nn.utils.rnn import pad_sequence
+
+
+def normalize_text(text):
+    """
+    规范化文本，例如将全角字符转换为半角字符。
+    """
+    full_width = "０１２３４５６７８９ＡＢＣＤＥＦＧＨＩＪＫＬＭＮＯＰＱＲＳＴＵＶＷＸＹＺａｂｃｄｅｆｇｈｉｊｋｌｍｎｏｐｑｒｓｔｕｖｗｘｙｚ！＃＄％＆’（）＊＋，－．／：；＜＝＞？＠［＼］＾＿｀｛｜｝～＂"
+    half_width = r"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!#$%&'" + r'()*+,-./:;<=>?@[\]^_`{|}~".'
+    mapping = str.maketrans(full_width, half_width)
+    return text.translate(mapping)
+
+
+class Vocabulary:
+    """
+    负责管理词汇表和 token 到 id 的映射。
+    """
+    def __init__(self, vocab_path):
+        with open(vocab_path, 'r', encoding='utf-8') as f:
+            self.tokens = json.load(f)
+        self.token_to_id = {token: i for i, token in enumerate(self.tokens)}
+        self.pad_id = self.token_to_id['<PAD>']
+        self.unk_id = self.token_to_id['<UNK>']
+
+    def __len__(self):
+        return len(self.tokens)
+
+    def convert_tokens_to_ids(self, tokens):
+        return [self.token_to_id.get(token, self.unk_id) for token in tokens]
+
+
+class NerDataProcessor(Dataset):
+    """
+    处理 NER 数据，并将其转换为适用于 PyTorch 模型的格式。
+    """
+    def __init__(self, data_path, vocab: Vocabulary, tag_map: dict):
+        self.vocab = vocab
+        self.tag_to_id = tag_map
+        self.records = []
+        with open(data_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                try:
+                    self.records.append(json.loads(line))
+                except json.JSONDecodeError:
+                    print(f"警告: 无法解析行: {line}")
+
+    def __len__(self):
+        return len(self.records)
+
+    def __getitem__(self, idx):
+        record = self.records[idx]
+        text = normalize_text(record['text'])
+        tokens = list(text)
+        
+        # 将文本 tokens 转换为 ids
+        token_ids = self.vocab.convert_tokens_to_ids(tokens)
+
+        # 初始化标签序列为 'O'
+        tags = ['O'] * len(tokens)
+        for entity in record.get('entities', []):
+            entity_type = entity['type']
+            start = entity['start_idx']
+            end = entity['end_idx'] - 1  # 转换为包含模式
+
+            if end >= len(tokens): continue
+
+            if start == end:
+                tags[start] = f'S-{entity_type}'
+            else:
+                tags[start] = f'B-{entity_type}'
+                tags[end] = f'E-{entity_type}'
+                for i in range(start + 1, end):
+                    tags[i] = f'M-{entity_type}'
+        
+        # 将标签转换为 ids
+        tag_ids = [self.tag_to_id.get(tag, self.tag_to_id['O']) for tag in tags]
+
+        return {
+            "token_ids": torch.tensor(token_ids, dtype=torch.long),
+            "tag_ids": torch.tensor(tag_ids, dtype=torch.long)
+        }
+
+
+def create_ner_dataloader(data_path, vocab, tag_map, batch_size, shuffle=False):
+    """
+    创建 NER 任务的 DataLoader。
+    """
+    dataset = NerDataProcessor(data_path, vocab, tag_map)
+    
+    def collate_batch(batch):
+        token_ids_list = [item['token_ids'] for item in batch]
+        tag_ids_list = [item['tag_ids'] for item in batch]
+
+        padded_token_ids = pad_sequence(token_ids_list, batch_first=True, padding_value=vocab.pad_id)
+        padded_tag_ids = pad_sequence(tag_ids_list, batch_first=True, padding_value=-100) # -100 用于在计算损失时忽略填充部分
+
+        attention_mask = (padded_token_ids != vocab.pad_id).long()
+
+        return padded_token_ids, padded_tag_ids, attention_mask
+
+    return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, collate_fn=collate_batch)
+
+
+if __name__ == '__main__':
+    # 文件路径
+    train_file = './data/CMeEE-V2_train.json'
+    vocab_file = './data/vocabulary.json'
+    categories_file = './data/categories.json'
+
+    # 1. 加载词汇表和标签映射
+    vocabulary = Vocabulary(vocab_path=vocab_file)
+    with open(categories_file, 'r', encoding='utf-8') as f:
+        tag_map = json.load(f)
+    print("词汇表和标签映射加载完成。")
+
+    # 2. 创建 DataLoader
+    train_loader = create_ner_dataloader(
+        data_path=train_file,
+        vocab=vocabulary,
+        tag_map=tag_map,
+        batch_size=4,
+        shuffle=True
+    )
+    print("DataLoader 创建完成。")
+
+    # 3. 验证一个批次的数据
+    print("\n--- 验证一个批次的数据 ---")
+    tokens, labels, mask = next(iter(train_loader))
+    
+    print(f"  Token IDs (shape): {tokens.shape}")
+    print(f"  Label IDs (shape): {labels.shape}")
+    print(f"  Attention Mask (shape): {mask.shape}")
+    print(f"  Token IDs (sample): {tokens[0][:20]}...")
+    print(f"  Label IDs (sample): {labels[0][:20]}...")
+    print(f"  Attention Mask (sample): {mask[0][:20]}...")
+```
+
+### 4.3 运行验证
+
+执行 `03_data_loader.py` 脚本会完整地加载所有数据，并输出一个批次数据的形状和示例，验证整个数据加载流程的正确性。
+
+```
+词汇表和标签映射加载完成。
+DataLoader 创建完成。
+
+--- 验证一个批次的数据 ---
+  Token IDs (shape): torch.Size([4, 152])
+  Label IDs (shape): torch.Size([4, 152])
+  Attention Mask (shape): torch.Size([4, 152])
+  ...
+```
+
+至此，我们已经通过三个独立的、流程化的脚本，完成了从原始 JSON 数据到模型可用的、批次化的 PyTorch Tensor 的全部转换工作。
 
 ---
 
