@@ -8,7 +8,7 @@
 
 ### 1.1 明确数据处理的目标
 
-在设计之前，我们首先要明确最终的目标。对于一个命名实体识别任务，数据处理流水线需要产出什么？
+在设计之前，我们首先要明确最终的目标。对于一个命名实体识别任务，数据处理需要产出什么？
 
 1.  **模型的输入 (X) 是什么？**
     -   它应该是一个整数张量，形状为 `[batch_size, seq_len]`。
@@ -25,20 +25,34 @@
 
 ### 1.2 数据格式解析
 
-我们使用的是 `CMeEE-V2`（中文医学实体抽取）数据集，采用 JSON Lines 格式存储。
+我们使用的是 `CMeEE-V2`（中文医学实体抽取）数据集。经过分析，该数据集采用的是标准的 **JSON 数组**格式。
 
 #### 1.2.1 原始数据示例
 
-打开 `CMeEE-V2_train.json`，每一行是一个独立的 JSON 对象：
+打开 `CMeEE-V2_train.json`，可以看到文件内容是一个完整的 JSON 数组：
 
 ```json
-{
-  "text": "胃癌癌前病变和胃癌根治术后患者，...",
-  "entities": [
-    {"start_idx": 7, "end_idx": 9, "type": "dis", "entity": "胃癌"},
-    {"start_idx": 29, "end_idx": 34, "type": "pro", "entity": "胃癌根治术"}
-  ]
-}
+[
+  ...,
+  {
+    "text": "（2）室上性心动过速可用常规抗心律失常药物控制，年龄小于5岁。",
+    "entities": [
+      {
+        "start_idx": 3,
+        "end_idx": 9,
+        "type": "dis",
+        "entity": "室上性心动过速"
+      },
+      {
+        "start_idx": 14,
+        "end_idx": 20,
+        "type": "dru",
+        "entity": "抗心律失常药物"
+      }
+    ]
+  },
+  ...
+]
 ```
 
 #### 1.2.2 字段说明
@@ -47,112 +61,180 @@
 -   **`entities`**：实体标注列表，每个实体包含：
     -   `start_idx`：实体起始位置（**包含**）
     -   `end_idx`：实体结束位置（**不包含**）
-    -   `type`：实体类型（如 `dis` 疾病、`pro` 诊疗程序）
+    -   `type`：实体类型（如 `dis` 疾病、`dru` 药物）
     -   `entity`：实体文本（用于验证）
 
-> **关键细节：索引的包含性**
+> **索引的包含性**
 >
 > 通过实际测试可以验证：`start_idx` **包含**在实体范围内，`end_idx` **不包含**。这与 Python 的切片操作 `text[start:end]` 行为一致。例如：
-> - 文本："胃癌癌前病变和胃癌根治术后患者"
-> - 实体 "胃癌"：`start_idx=7, end_idx=9`
-> - 实际字符：`text[7:9]` = "胃癌"（索引7和8）
+> - 文本："（2）室上性心动过速可用常规抗心律失常药物控制，年龄小于5岁。"
+> - 实体 "室上性心动过速"：`start_idx=3, end_idx=9`
+> - 实际字符：`text[3:9]` = "室上性心动过速"（索引3到8）
 >
-> 因此，实体长度 = `end_idx - start_idx`
+> 所以，实体长度 = `end_idx - start_idx`
 
-## 二、步骤一：构建标签映射体系
+## 二、构建标签映射
 
 > **目标**：从原始数据中提取所有实体类型，然后基于 `BMES` 标注方案构建一个全局统一的“标签-ID”映射表。
->
-> **对应脚本**：`code/C8/01_build_category.py`
 
-### 2.1 设计思路
+### 2.1 加载数据
 
-在开始编码前，我们先梳理一下思路：
+在处理任何数据之前，首要需要把它加载到内存里。
 
-1.  **输入**：一个或多个原始数据文件（`.json` 格式）。
-2.  **核心逻辑**：
-    *   我们需要一个函数，能够读取单个文件，并抽取出其中 `entities` 字段下所有的 `type` 值。
-    *   为了防止重复，使用 `set` 数据结构来收集这些实体类型。
-    *   遍历所有输入文件（训练集、验证集等），将所有实体类型汇总。
-    *   为了保证每次生成的 ID 映射都是固定的（这对于模型复现至关重要），需要对汇总后的实体类型进行**排序**。
-    *   创建一个字典，首先放入 `'O': 0` 作为非实体标签。然后遍历排序后的实体类型列表，为每一种类型生成 `B-`、`M-`、`E-`、`S-` 四种标签，并依次赋予递增的整数 ID。
-3.  **输出**：一个 `categories.json` 文件，以 JSON 格式存储最终的“标签-ID”映射字典。
+#### 2.1.1 调试观察数据结构
 
-### 2.2 核心代码实现
+开始的代码很简单，只有一个目的：读取文件并加载其内容。
 
-根据以上思路，我们编写 `01_build_category.py` 脚本：
-
-```python:code/C8/01_build_category.py
+```python
 import json
-import os
-from collections import Counter
 
+def collect_entity_types_from_file(file_path):
+    with open(file_path, 'r', encoding='utf-8') as f:
+        all_data = json.load(f) # 下断点
 
-def save_json_pretty(data, file_path):
-    """
-    将 Python 对象以格式化的 JSON 形式保存到文件。
-    """
+if __name__ == '__main__':
+    train_file = './data/CMeEE-V2_train.json'
+    collect_entity_types_from_file(train_file)
+```
+
+**操作指引**：
+
+如 **图 2.1** 所示，调试过程分为三步：
+1.  **设置断点**：在代码行 `all_data = json.load(f)` 左侧的行号旁边单击，设置一个断点。
+2.  **启动调试**：点击 PyCharm 右上角的“Debug”按钮（绿色甲虫图标），以调试模式运行当前脚本。程序会自动执行到断点所在行并**暂停**，此时 `all_data` 变量还未被赋值。
+3.  **单步执行 (Step Over)**：点击调试控制台中的“Step Over”按钮。此操作会执行当前行代码。执行后，`all_data` 变量才会被成功赋值。
+
+<div align="center">
+  <img src="./images/8_2_1.png" alt="PyCharm 调试器观察数据结构" />
+  <p>图 2.1: PyCharm 调试器观察数据结构</p>
+</div>
+
+完成以上步骤后，可以在下方的“Debug”工具窗口中展开 `all_data` 变量，从而审查其内部结构。通过观察 **图 2.1**，我们可以得出结论：
+-   `all_data` 是一个 `list`（列表）。
+-   列表中的每一个元素都是一个 `dict`（字典），代表一条标注数据。
+-   每个字典都包含 `text` 和 `entities` 两个键。
+
+> 以上步骤以 PyCharm 为例，但其调试逻辑（设置断点、启动调试、单步执行）在 VS Code 等其他主流 IDE 中是完全通用的。
+>
+> 刚刚我们通过断点调试，清楚地看到了 `all_data` 的内部结构，这为编写后续的遍历代码提供了依据。请记住这种方法，后续学习中如果遇到任何不理解的代码或不清楚的变量，都可以使用同样的方式：“**哪里不会 D 哪里**😉”。
+
+#### 2.1.2 提取实体类型
+
+既然已经清楚了数据结构，下一步就是遍历这个列表，从每个字典中提取出我们真正关心的信息——实体类型。
+
+```python
+import json
+
+def collect_entity_types_from_file(file_path):
+    types = set()
+    with open(file_path, 'r', encoding='utf-8') as f:
+        all_data = json.load(f)
+        for data in all_data:
+            # 遍历实体列表，提取 'type' 字段
+            for entity in data['entities']:
+                types.add(entity['type'])
+    return types
+
+if __name__ == '__main__':
+    train_file = './data/CMeEE-V2_train.json'
+    entity_types = collect_entity_types_from_file(train_file)
+    print(f"从 {train_file} 中提取的实体类型: {entity_types}")
+```
+
+运行结果：
+```
+从 ./data/CMeEE-V2_train.json 中提取的实体类型: {'dru', 'dep', 'dis', 'bod', 'mic', 'equ', 'sym', 'pro', 'ite'}
+```
+
+### 2.2 处理多个文件并保证顺序
+
+下一步需要完成两件事：
+1.  处理所有的数据文件（训练集、验证集），以确保包含了全部的实体类型。
+2.  对提取出的实体类型进行**排序**，以保证每次生成的标签 ID 映射都是完全一致的。
+
+基于此，我们对代码进行扩展：
+
+```python
+# (collect_entity_types_from_file 函数保持不变，此处省略)
+# ...
+
+def generate_tag_map(data_files):
+    all_entity_types = set()
+    for file_path in data_files:
+        types_in_file = collect_entity_types_from_file(file_path)
+        all_entity_types.update(types_in_file)
+    
+    # 排序，保证每次运行结果一致
+    sorted_types = sorted(list(all_entity_types))
+
+    # 后续将在这里构建 BMES 映射
+    # ...
+
+if __name__ == '__main__':
+    train_file = './data/CMeEE-V2_train.json'
+    dev_file = './data/CMeEE-V2_dev.json'
+    
+    generate_tag_map(data_files=[train_file, dev_file])
+```
+
+### 2.3 构建 BMES 标签映射
+
+有了排序后的实体类型列表，我们就可以构建最终的 `tag_to_id` 映射字典了。规则如下：
+- 非实体标签 `'O'` 的 ID 为 `0`。
+- 对于每一种实体类型（如 `dis`），我们都生成 `B-dis`, `M-dis`, `E-dis`, `S-dis` 四种标签，并按顺序赋予递增的 ID。
+
+```python
+# ... (在 generate_tag_map 函数内部) ...
+
+# ... (汇总和排序逻辑) ...
+sorted_types = sorted(list(all_entity_types))
+
+# 构建 BMES 标签映射
+tag_to_id = {'O': 0}  # 'O' 代表非实体
+for entity_type in sorted_types:
+    for prefix in ['B', 'M', 'E', 'S']:
+        tag_name = f"{prefix}-{entity_type}"
+        tag_to_id[tag_name] = len(tag_to_id)
+
+print(f"\n已生成 {len(tag_to_id)} 个标签映射。")
+```
+
+### 2.4 封装与保存
+
+最后，为了让这个映射表能够被其他脚本方便地使用，需要将它保存成一个 JSON 文件。
+
+```python
+def save_json(data, file_path):
     os.makedirs(os.path.dirname(file_path), exist_ok=True)
     with open(file_path, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
 
-
 def collect_entity_types_from_file(file_path):
-    """
-    从单个数据文件中提取所有唯一的实体类型。
-    """
-    types = set()
-    with open(file_path, 'r', encoding='utf-8') as f:
-        for line in f:
-            try:
-                data = json.loads(line)
-                # 遍历实体列表，提取 'type' 字段
-                for entity in data.get('entities', []):
-                    types.add(entity['type'])
-            except json.JSONDecodeError:
-                print(f"警告: 无法解析行: {line} in {file_path}")
-    return types
+    # ... (函数已在前面定义，此处省略)
 
+def generate_tag_map(data_files, output_file): # 添加 output_file 参数
+    # 1. 汇总所有实体类型 ...
 
-def generate_tag_map(data_files, output_file):
-    """
-    从多个数据文件构建并保存一个完整的标签到ID的映射表。
-    """
-    # 1. 从所有提供的数据文件中提取所有唯一的实体类型
-    all_entity_types = set()
-    for file_path in data_files:
-        all_entity_types.update(collect_entity_types_from_file(file_path))
+    # 2. 排序以保证映射一致性 ...
 
-    # 排序以确保每次生成的映射表顺序一致
-    sorted_types = sorted(list(all_entity_types))
-    print(f"发现的实体类型: {sorted_types}")
+    # 3. 构建 BMES 标签映射 ...
 
-    # 2. 基于BMES模式构建 label2id 映射字典
-    tag_to_id = {'O': 0}  # 'O' 代表非实体 (Outside)
-    for entity_type in sorted_types:
-        for prefix in ['B', 'M', 'E', 'S']:
-            tag_name = f"{prefix}-{entity_type}"
-            tag_to_id[tag_name] = len(tag_to_id)
-
-    print(f"\n已生成 {len(tag_to_id)} 个标签映射。")
-
-    # 3. 将映射表保存到指定的输出文件
-    save_json_pretty(tag_to_id, output_file)
+    # 4. 保存映射文件
+    save_json(tag_to_id, output_file)
     print(f"标签映射已保存至: {output_file}")
 
-
 if __name__ == '__main__':
-    # 定义输入的数据文件和期望的输出路径
     train_file = './data/CMeEE-V2_train.json'
     dev_file = './data/CMeEE-V2_dev.json'
     output_path = './data/categories.json'
-
     generate_tag_map(data_files=[train_file, dev_file], output_file=output_path)
 ```
 
-### 2.3 运行结果
+通过这样一步步的迭代和完善，我们从一个基础的思路，最终构建出了一个可复用的预处理脚本。
 
-执行此脚本后，会生成 `data/categories.json` 文件，内容如下（部分展示），完美符合我们的预期输出：
+### 2.5 运行结果
+
+执行最终的 `01_build_category.py` 脚本，会生成 `data/categories.json` 文件，内容如下（部分展示）：
 
 ```json
 {
@@ -168,15 +250,14 @@ if __name__ == '__main__':
     "B-dis": 9,
     "M-dis": 10,
     "E-dis": 11,
-    "S-dis": 12
+    "S-dis": 12,
+    ...
 }
 ```
 
-## 三、步骤二：构建词汇表
+## 三、构建词汇表
 
-> **目标**：创建一个“字符-ID”的映射表（即词汇表），为后续将文本转换为数字序列做准备。
->
-> **对应脚本**：`code/C8/02_build_vocabulary.py`
+创建一个“字符-ID”的映射表（即词汇表），为后续将文本转换为数字序列做准备。
 
 ### 3.1 设计思路
 

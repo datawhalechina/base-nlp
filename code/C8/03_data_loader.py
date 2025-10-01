@@ -39,13 +39,8 @@ class NerDataProcessor(Dataset):
     def __init__(self, data_path, vocab: Vocabulary, tag_map: dict):
         self.vocab = vocab
         self.tag_to_id = tag_map
-        self.records = []
         with open(data_path, 'r', encoding='utf-8') as f:
-            for line in f:
-                try:
-                    self.records.append(json.loads(line))
-                except json.JSONDecodeError:
-                    print(f"警告: 无法解析行: {line}")
+            self.records = json.load(f)
 
     def __len__(self):
         return len(self.records)

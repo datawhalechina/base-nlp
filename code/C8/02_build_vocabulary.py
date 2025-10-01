@@ -29,13 +29,10 @@ def create_char_vocab(data_files, output_file, min_freq=1):
     char_counts = Counter()
     for file_path in data_files:
         with open(file_path, 'r', encoding='utf-8') as f:
-            for line in f:
-                try:
-                    data = json.loads(line)
-                    text = normalize_text(data['text'])
-                    char_counts.update(list(text))
-                except (json.JSONDecodeError, KeyError):
-                    print(f"警告: 无法处理行: {line} in {file_path}")
+            all_data = json.load(f)
+            for data in all_data:
+                text = normalize_text(data['text'])
+                char_counts.update(list(text))
 
     # 过滤低频词
     frequent_chars = [char for char, count in char_counts.items() if count >= min_freq]

@@ -1,9 +1,8 @@
 import json
 import os
-from collections import Counter
 
 
-def save_json_pretty(data, file_path):
+def save_json(data, file_path):
     """
     将数据以格式化的 JSON 形式保存到文件。
     """
@@ -14,17 +13,15 @@ def save_json_pretty(data, file_path):
 
 def collect_entity_types_from_file(file_path):
     """
-    从单个文件中收集所有实体类型。
+    从单个数据文件中提取所有唯一的实体类型。
     """
     types = set()
     with open(file_path, 'r', encoding='utf-8') as f:
-        for line in f:
-            try:
-                data = json.loads(line)
-                for entity in data.get('entities', []):
-                    types.add(entity['type'])
-            except json.JSONDecodeError:
-                print(f"警告: 无法解析行: {line} in {file_path}")
+        all_data = json.load(f)
+        for data in all_data:
+            # 遍历实体列表，提取 'type' 字段
+            for entity in data['entities']:
+                types.add(entity['type'])
     return types
 
 
@@ -51,7 +48,7 @@ def generate_tag_map(data_files, output_file):
     print(f"\n已生成 {len(tag_to_id)} 个标签映射。")
 
     # 4. 保存映射文件
-    save_json_pretty(tag_to_id, output_file)
+    save_json(tag_to_id, output_file)
     print(f"标签映射已保存至: {output_file}")
 
 
