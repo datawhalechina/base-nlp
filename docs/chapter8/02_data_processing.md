@@ -257,31 +257,76 @@ if __name__ == '__main__':
 
 ## 三、构建词汇表
 
-创建一个“字符-ID”的映射表（即词汇表），为后续将文本转换为数字序列做准备。
+接下来我们需要创建一个“字符-ID”的映射表（即词汇表），为后续将文本转换为数字序列做准备。
 
-### 3.1 设计思路
+### 3.1 统计所有字符
 
-1.  **问题分析**：
-    *   模型无法直接处理文本，需要将字符转换为数字 ID。
-    *   原始文本中可能包含语义相同但编码不同的字符，如全角字符（`Ａ`）和半角字符（`A`）。如果不统一，它们会被视为两个不同的 token，这会不必要地增加词汇表大小，并可能影响模型学习。
-2.  **核心逻辑**：
-    *   首先，需要一个**文本规范化**函数，将所有全角字符统一转换为半角。
-    *   遍历所有数据文件，读取每一行文本。
-    *   对每一行文本进行规范化处理。
-    *   使用 `collections.Counter` 来高效统计所有出现过的字符及其频率。
-    *   （可选）可以设置一个频率阈值 `min_freq` 来过滤掉低频或罕见的字符，以减小词汇表规模。
-    *   在最终的词汇表前，添加两个特殊的 token：`<PAD>`（用于后续填充）和 `<UNK>`（用于表示未登录词）。
-3.  **输出**：一个 `vocabulary.json` 文件，它是一个列表，存储了所有词汇（包括特殊 token）。
+我们的首要任务是获取数据中出现的所有字符。`collections.Counter` 是完成这项任务的绝佳工具。
 
-### 3.2 核心代码实现
+```python
+from collections import Counter
+import json
 
-```python:code/C8/02_build_vocabulary.py
+def create_char_vocab(data_files):
+    char_counts = Counter()
+    for file_path in data_files:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            all_data = json.load(f)
+            for data in all_data:
+                char_counts.update(list(data['text']))
+    
+    print(f"初步统计的字符种类数: {len(char_counts)}")
+    print("频率最高的5个字符:", char_counts.most_common(5))
+```
+
+### 3.2 文本规范化
+
+在检查初步统计的字符时，会发现一个问题：数据中可能同时包含**全角字符**（如 `，`，`（`）和**半角字符**（如 `,`，`(`）。它们在语义上相同，但会被视为两个不同的 token。
+
+为了减小词汇表规模并提升模型泛化能力，需要将它们统一。一个通用的策略是**将所有全角字符转换为半角字符**。
+
+```python
+def normalize_text(text):
+    """
+    规范化文本，例如将全角字符转换为半角字符。
+    """
+    full_width = "０１２３４５６７８９ＡＢＣＤＥＦＧＨＩＪＫＬＭＮＯＰＱＲＳＴＵＶＷＸＹＺａｂｃｄｅｆｇｈｉｊｋｌｍｎｏｐｑｒｓｔｕｖｗｘｙｚ！＃＄％＆’（）＊＋，－．／：；＜＝＞？＠［＼］＾＿｀｛｜｝～＂"
+    half_width = r"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!#$%&'" + r'()*+,-./:;<=>?@[\]^_`{|}~".'
+    mapping = str.maketrans(full_width, half_width)
+    return text.translate(mapping)
+
+def create_char_vocab(data_files):
+    char_counts = Counter()
+    for file_path in data_files:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            all_data = json.load(f)
+            for data in all_data:
+                # 在统计前先进行规范化
+                normalized_text = normalize_text(data['text'])
+                char_counts.update(list(normalized_text))
+    
+    print(f"初步统计的字符种类数: {len(char_counts)}")
+    print("频率最高的5个字符:", char_counts.most_common(5))
+```
+
+### 3.3 过滤、排序与添加特殊符
+
+接下来，进行收尾工作：
+1.  **过滤低频词**：可以设定一个阈值 `min_freq`，移除出现次数过少的罕见字，以进一步精简词汇表。
+2.  **排序**：与标签映射一样，对最终的字符列表进行排序，确保每次生成的词汇表文件内容完全一致。
+3.  **添加特殊 Token**：在列表的最前面，加入两个特殊的标记：`<PAD>`（用于后续对齐序列）和 `<UNK>`（用于表示词汇表中不存在的未知字符）。
+
+### 3.4 封装与保存
+
+我们将以上所有逻辑整合，并加入保存文件的功能，便得到了最终的 `02_build_vocabulary.py` 脚本。
+
+```python
 import json
 import os
 from collections import Counter
 
 
-def save_json_pretty(data, file_path):
+def save_json(data, file_path):
     """
     将数据以易于阅读的格式保存为 JSON 文件。
     """
@@ -299,36 +344,30 @@ def normalize_text(text):
     mapping = str.maketrans(full_width, half_width)
     return text.translate(mapping)
 
-
 def create_char_vocab(data_files, output_file, min_freq=1):
-    """
-    从数据文件创建字符级词汇表。
-    """
+    # 1. 统计规范化后的字符频率
     char_counts = Counter()
     for file_path in data_files:
         with open(file_path, 'r', encoding='utf-8') as f:
-            for line in f:
-                try:
-                    data = json.loads(line)
-                    text = normalize_text(data['text'])
-                    char_counts.update(list(text))
-                except (json.JSONDecodeError, KeyError):
-                    print(f"警告: 无法处理行: {line} in {file_path}")
+            all_data = json.load(f)
+            for data in all_data:
+                text = normalize_text(data['text'])
+                char_counts.update(list(text))
 
-    # 过滤低频词
+    # 2. 过滤低频词
     frequent_chars = [char for char, count in char_counts.items() if count >= min_freq]
     
-    # 保证每次生成结果一致
+    # 3. 排序
     frequent_chars.sort()
 
-    # 添加特殊标记
+    # 4. 添加特殊标记
     special_tokens = ["<PAD>", "<UNK>"]
     final_vocab_list = special_tokens + frequent_chars
     
     print(f"词汇表大小 (min_freq={min_freq}): {len(final_vocab_list)}")
 
-    # 保存词汇表
-    save_json_pretty(final_vocab_list, output_file)
+    # 5. 保存词汇表
+    save_json(final_vocab_list, output_file)
     print(f"词汇表已保存至: {output_file}")
 
 
@@ -336,23 +375,7 @@ if __name__ == '__main__':
     train_file = './data/CMeEE-V2_train.json'
     dev_file = './data/CMeEE-V2_dev.json'
     output_path = './data/vocabulary.json'
-
-    # 设置字符最低频率，1表示包含所有出现过的字符
     create_char_vocab(data_files=[train_file, dev_file], output_file=output_path, min_freq=1)
-```
-
-### 3.3 运行结果
-
-执行后，会生成 `data/vocabulary.json` 文件，它是一个列表，索引 `0` 和 `1` 分别是 `<PAD>` 和 `<UNK>`：
-
-```json
-[
-    "<PAD>",
-    "<UNK>",
-    " ",
-    "!",
-    ...
-]
 ```
 
 ## 四、步骤三：封装数据加载器
