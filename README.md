@@ -21,7 +21,7 @@
   </a>
 </div>
 
-> **注意：本项目当前未完成暂不接受 Pull Request。**
+> **注意：本项目当前暂不接受 Pull Request。**
 > 如果您有任何建议或发现任何问题，欢迎通过 [Issue](https://github.com/datawhalechina/base-nlp/issues) 进行反馈。
 
 ## 项目简介
