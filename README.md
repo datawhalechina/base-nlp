@@ -68,7 +68,7 @@
     - [x] [文本分类简单实现](./docs/chapter7/01_text_classification.md)
 - **第2章：命名实体识别**
     - [x] [命名实体识别](./docs/chapter8/01_named_entity_recognition.md)
-    - [] [NER 项目的数据处理]()
+    - [x] [NER 项目的数据处理](./docs/chapter8/02_data_processing.md)
 
 ### 第三部分：微调量化篇
 - **第1章：参数高效微调**

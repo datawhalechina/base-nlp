@@ -1,6 +1,6 @@
 # 第二节 NER 项目的数据处理
 
-在上一节中，我们简单介绍了命名实体识别的任务定义、应用场景及主流实现方法。本节将正式进入编码阶段，从数据处理开始，逐步构建一个完整的 NER 项目。为了清晰地构建 NER 的处理流程，我们采用流程化的代码组织思路，将整个流程拆分为多个独立的脚本。
+在上一节，我们简单了解了命名实体识别的任务定义、应用场景及主流实现方法。本节将正式进入编码阶段，从数据处理开始，逐步构建一个完整的 NER 项目。为了清晰地构建 NER 的处理流程，我们采用流程化的代码组织思路，将整个流程拆分为多个独立的脚本。
 
 ## 一、数据处理流程总览
 
@@ -109,7 +109,7 @@ if __name__ == '__main__':
   <p>图 2.1: PyCharm 调试器观察数据结构</p>
 </div>
 
-完成以上步骤后，可以在下方的“Debug”工具窗口中展开 `all_data` 变量，从而审查其内部结构。通过观察 **图 2.1**，我们可以得出结论：
+完成以上步骤后，可以在下方的“Debug”工具窗口中展开 `all_data` 变量，从而审查其内部结构。通过观察 **图 2.1**，可以得出结论：
 -   `all_data` 是一个 `list`（列表）。
 -   列表中的每一个元素都是一个 `dict`（字典），代表一条标注数据。
 -   每个字典都包含 `text` 和 `entities` 两个键。
@@ -152,7 +152,7 @@ if __name__ == '__main__':
 1.  处理所有的数据文件（训练集、验证集），以确保包含了全部的实体类型。
 2.  对提取出的实体类型进行**排序**，以保证每次生成的标签 ID 映射都是完全一致的。
 
-基于此，我们对代码进行扩展：
+基于此，对代码进行扩展：
 
 ```python
 # (collect_entity_types_from_file 函数保持不变，此处省略)
@@ -179,9 +179,9 @@ if __name__ == '__main__':
 
 ### 2.3 构建 BMES 标签映射
 
-有了排序后的实体类型列表，我们就可以构建最终的 `tag_to_id` 映射字典了。规则如下：
+有了排序后的实体类型列表，就可以构建最终的 `tag_to_id` 映射字典了。规则如下：
 - 非实体标签 `'O'` 的 ID 为 `0`。
-- 对于每一种实体类型（如 `dis`），我们都生成 `B-dis`, `M-dis`, `E-dis`, `S-dis` 四种标签，并按顺序赋予递增的 ID。
+- 对于每一种实体类型（如 `dis`），都生成 `B-dis`, `M-dis`, `E-dis`, `S-dis` 四种标签，并按顺序赋予递增的 ID。
 
 ```python
 # ... (在 generate_tag_map 函数内部) ...
@@ -370,7 +370,7 @@ if __name__ == '__main__':
 
 ## 四、封装数据加载器
 
-现在我们有了标签映射和词汇表，最后一步就是构建一个可复用的 `DataLoader`，将文本数据高效地转换成 PyTorch 模型能够理解的格式。
+现在有了标签映射和词汇表，最后一步就是构建一个可复用的 `DataLoader`，将文本数据高效地转换成 PyTorch 模型能够理解的格式。
 
 直接用循环读取数据并手动转换是低效且不灵活的。一个合格的数据加载器需要解决**自动批量化**、**序列填充**、**数据转换**和**随机化**这几个问题。
 
@@ -487,7 +487,12 @@ if __name__ == '__main__':
 
 ### 4.3 整合为 DataLoader
 
-最后，定义 `create_ner_dataloader` 函数，它内部包含 `collate_fn`，负责将 `NerDataProcessor` 返回的单条数据打包、填充成一个完整的 batch，形成最终可供模型使用的数据。
+最后，定义 `create_ner_dataloader` 函数。它接收 `Dataset` 实例，并将其封装成一个 `DataLoader`。在 NLP 任务中，由于每个样本（句子）的长度都不同，所以不能直接让 `DataLoader` 使用默认的方式打包数据，否则会因序列长度不一而报错。因此，我们需要提供一个自定义的 `collate_fn` (校对函数) 来解决这个问题。
+
+`collate_fn` 的主要任务，就是将从 `Dataset` 中取出的、由多条数据组成的列表（`batch`），“聚合”成一个统一的、规整的批次。在当前任务中，它主要负责两件事：
+
+1.  **动态填充 (Padding)**：找到当前批次中最长的序列，并将这个批次内的所有样本都填充到这个最大长度。
+2.  **生成 Attention Mask**：创建一个 `mask` 矩阵，用来标记哪些是真实的 Token (值为 `1`)，哪些是填充的 Token (值为 `0`)。
 
 ```python
 # ... 
@@ -502,7 +507,6 @@ def create_ner_dataloader(data_path, vocab, tag_map, batch_size, shuffle=False):
         tag_ids_list = [item['tag_ids'] for item in batch]
 
         padded_token_ids = pad_sequence(token_ids_list, batch_first=True, padding_value=vocab.pad_id)
-        # tag_ids 使用 -100 进行填充，这个值会被 PyTorch 的损失函数（如 CrossEntropyLoss）自动忽略
         padded_tag_ids = pad_sequence(tag_ids_list, batch_first=True, padding_value=-100)
         attention_mask = (padded_token_ids != vocab.pad_id).long()
 
@@ -544,13 +548,15 @@ if __name__ == '__main__':
     print(f"  Attention Mask shape: {mask.shape}")
 ```
 
+> **为什么 `tag_ids` 的填充值是 `-100`？**
+>
+> 这是一个 PyTorch 中的惯例。在计算损失时，我们不希望填充位置的标签对最终的损失值和梯度产生影响。PyTorch 的交叉熵损失函数 `torch.nn.CrossEntropyLoss` 中有一个参数 `ignore_index`，它的默认值恰好是 `-100`。
+>
+> 当损失函数看到标签值为 `-100` 时，会自动“忽略”这个位置，不计算它的损失。
+
 `torch.utils.data.DataLoader` 是 PyTorch 的核心数据加载工具，它像一个高度自动化的“数据供应管道”。将 `NerDataProcessor` 实例（`dataset`）作为数据源传入，并配置了几个关键参数：
 -   **`batch_size`**：定义了每个批次包含多少样本。
 -   **`shuffle=True`**：使得加载器在每个 epoch 开始时都随机打乱数据顺序，能有效提升泛化能力。
--   **`collate_fn`**：这是最关键的参数，它指定了如何将 `batch_size` 个单独的样本“校对”和“打包”成一个规整的批次。我们传入的 `collate_batch` 函数在这里完成了动态填充和 `attention_mask` 的创建工作。
+-   **`collate_fn`**：这是最关键的参数，它指定了如何将 `batch_size` 个单独的样本“校对”和“打包”成一个规整的批次。传入的 `collate_batch` 函数在这里完成了动态填充和 `attention_mask` 的创建工作。
 
 至此，我们完成了从原始 JSON 数据到模型可用的、批量化的 Tensor 数据的全部预处理流程。
-
----
-
-> 完整代码请参考：[GitHub 仓库](https://github.com/FutureUnreal/base-nlp/tree/main/code/C8)
