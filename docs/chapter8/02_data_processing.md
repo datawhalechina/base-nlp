@@ -70,8 +70,8 @@
 >
 > 通过实际测试可以验证：`start_idx` **包含** 在实体范围内，`end_idx` **不包含**。这与 Python 的切片操作 `text[start:end]` 行为一致。例如：
 > - 文本："（2）室上性心动过速可用常规抗心律失常药物控制，年龄小于5岁。"
-> - 实体 "室上性心动过速"：`start_idx=3, end_idx=9`
-> - 实际字符：`text[3:9]` = "室上性心动过速"（索引3到8）
+> - 实体 "室上性心动过速"：`start_idx=3, end_idx=10`
+> - 实际字符：`text[3:10]` = "室上性心动过速"（索引3到9）
 >
 > 所以，实体长度 = `end_idx - start_idx`
 
@@ -497,6 +497,7 @@ if __name__ == '__main__':
 ```python
 # ... 
 from torch.utils.data import Dataset, DataLoader
+from torch.nn.utils.rnn import pad_sequence
 # ... (省略前面所有的类和函数定义) ...
 
 def create_ner_dataloader(data_path, vocab, tag_map, batch_size, shuffle=False):
@@ -548,16 +549,14 @@ if __name__ == '__main__':
     print(f"  Attention Mask shape: {mask.shape}")
 ```
 
-> **为什么 `tag_ids` 的填充值是 `-100`？**
->
-> 这是一个 PyTorch 中的惯例。在计算损失时，我们不希望填充位置的标签对最终的损失值和梯度产生影响。PyTorch 的交叉熵损失函数 `torch.nn.CrossEntropyLoss` 中有一个参数 `ignore_index`，它的默认值恰好是 `-100`。
->
-> 当损失函数看到标签值为 `-100` 时，会自动“忽略”这个位置，不计算它的损失。
-
 `torch.utils.data.DataLoader` 是 PyTorch 的核心数据加载工具，它像一个高度自动化的“数据供应管道”。将 `NerDataProcessor` 实例（`dataset`）作为数据源传入，并配置了几个关键参数：
 -   **`batch_size`**：定义了每个批次包含多少样本。
 -   **`shuffle=True`**：使得加载器在每个 epoch 开始时都随机打乱数据顺序，能有效提升泛化能力。
 -   **`collate_fn`**：这是最关键的参数，它指定了如何将 `batch_size` 个单独的样本“校对”和“打包”成一个规整的批次。传入的 `collate_batch` 函数在这里完成了动态填充和 `attention_mask` 的创建工作。
 
 
-> 至此，我们完成了从原始 JSON 数据到模型可用的、批量化的 Tensor 数据的全部预处理流程。
+> **为什么 `tag_ids` 的填充值是 `-100`？**
+>
+> 这是一个 PyTorch 中的惯例。在计算损失时，我们不希望填充位置的标签对最终的损失值和梯度产生影响。PyTorch 的交叉熵损失函数 `torch.nn.CrossEntropyLoss` 中有一个参数 `ignore_index`，它的默认值恰好是 `-100`。
+>
+> 当损失函数看到标签值为 `-100` 时，会自动“忽略”这个位置，不计算它的损失。
