@@ -21,3 +21,6 @@
 
 - **第8章：进阶主题**
     - [命名实体识别](./chapter8/01_named_entity_recognition.md)
+    - [第一节 命名实体识别概要](chapter8/01_named_entity_recognition.md)
+    - [第二节 NER 项目的数据处理](chapter8/02_data_processing.md)
+    - [第三节 模型构建、训练与推理](chapter8/03_model_building_and_training.md)
