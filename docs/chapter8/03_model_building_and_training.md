@@ -149,7 +149,7 @@ if __name__ == '__main__':
 
 **运行结果：**
 
-```text
+```bash
 Logits shape: torch.Size([2, 8, 10])
 Loss shape: torch.Size([2, 8])
 
