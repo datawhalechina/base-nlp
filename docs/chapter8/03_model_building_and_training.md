@@ -154,7 +154,7 @@ Logits shape: torch.Size([2, 8, 10])
 Loss shape: torch.Size([2, 8])
 
 每个 Token 的损失:
-tensor([[2.3364, 2.2961, 2.3879, 2.3275, 0.0000, 0.0000, 0.0000, 0.0000],d
+tensor([[2.3364, 2.2961, 2.3879, 2.3275, 0.0000, 0.0000, 0.0000, 0.0000],
         [2.2855, 2.3020, 2.2478, 2.3787, 2.2882, 2.3392, 2.3553, 0.0000]],
        grad_fn=<ViewBackward0>)
 ```
@@ -164,15 +164,62 @@ tensor([[2.3364, 2.2961, 2.3879, 2.3275, 0.0000, 0.0000, 0.0000, 0.0000],d
 2.  **损失形状正确**：由于设置了 `reduction='none'`，损失张量的形状 `[2, 8]` 与 `label_ids` 一致，返回了每个 Token 各自的损失。
 3.  **`ignore_index` 生效**：可以看到 `label_ids` 中值为 `-100` 的填充位置，其对应的损失值为 `0`。这证明损失函数成功忽略了这些填充位，避免了无效信息对模型训练的干扰。
 
-### 2.3 升级为双向模型 (BiGRUNerNetWork)
+> 你可能会注意到，在 `GRUNerNetWork` 的 `forward` 方法中，并没有使用 `attention_mask` 来处理填充。那为什么模型还能正常工作呢？
+>
+> 这是 **单向 GRU 的计算特性** 和 **损失函数的 `ignore_index` 机制** 共同作用的结果：
+> 1.  **单向计算**：GRU 从左到右处理序列，在计算一个真实 Token（如 `w_i`）的特征时，它只依赖于其左侧的上下文（`w_1, ..., w_{i-1}`）。序列末尾的 Padding Token **不会影响** 到它前面真实 Token 的特征计算。
+> 2.  **损失忽略**：Padding Token 虽然也会经过模型产生 `logits`，但由于在 `label_ids` 中已将这些位置标记为 `-100`，损失函数会自动忽略这些位置的损失。
+>
+> 所以，对于单向 RNN，Padding 虽然参与了计算，但其产生的影响最终被损失函数“屏蔽”了。不过，**这种“侥幸”在双向模型中将不复存在**。
 
-单向 GRU 只能从左到右处理文本，这意味着在判断一个词的标签时，模型只能利用它左侧的上下文信息，而无法看到右侧的语境。这显然是一个局限。
+### 2.3 双向模型改进
 
-为了克服这一点，我们可以轻松地将其升级为 **双向 GRU (Bi-GRU)**。Bi-GRU 包含两个并行的 GRU 层：一个从左到右处理，另一个从右到左处理。最后，它会将两个方向的输出特征**拼接**在一起，从而让每个时间步的输出都包含了完整的上下文信息。
+单向 GRU 无法看到未来的上下文，这是一个天然的局限。在当前的任务中为了让模型在预测每一个 Token 时都能同时“左顾右盼”，最简单的改进就是引入 **双向 GRU**。不过，我们 **不能通过简单地设置 `bidirectional=True`** 来实现双向 GRU。
 
-代码的主要改动如下：
+因为，双向 GRU 包含一个从右到左的反向传播路径。它会从序列的末尾开始计算，如果末尾都是无意义的 `<PAD>` 标记，那么这些“垃圾信息”就会作为初始状态，一路污染到序列中真实的 Token 表示中去。所以，需要一种方法来“告知”GRU 每个序列的真实长度，让它在计算时能够忽略掉这些填充位。这就是 `attention_mask` 发挥作用的地方。
+
+#### 2.3.1 变长序列处理
+
+既然问题的根源在于 RNN 无法区分真实 Token 和填充位，那么解决方案的重点就是：在将数据送入 RNN 之前，以某种方式明确地告诉它每个序列的真实长度。
+
+PyTorch 提供了一套工具——`torch.nn.utils.rnn.pack_padded_sequence`。可以先来看看它的源码定义，重点关注输入参数：
+
+```python
+# torch/nn/utils/rnn.py
+
+def pack_padded_sequence(
+    input: Tensor,
+    lengths: Union[Tensor, list[int]],
+    batch_first: bool = False,
+    enforce_sorted: bool = True,
+) -> PackedSequence:
+    r"""Packs a Tensor containing padded sequences of variable length.
+
+    # ... (省略大部分文档) ...
+
+    Args:
+        input (Tensor): 经过填充的、变长的序列批次。
+        lengths (Tensor or list(int)): 一个列表或张量，包含了批次中每个序列的真实长度。
+        batch_first (bool, optional): 如果为 True，则输入张量的形状为 (B, T, *)。
+        enforce_sorted (bool, optional): 如果为 True (默认)，则要求输入序列已按长度降序排列。
+                                        如果为 False，函数会在内部自动进行排序。
+
+    Returns:
+        一个 PackedSequence 对象
+    """
+    # ... (省略内部实现逻辑) ...
+```
+
+从源码中可以看到，这个函数的核心作用就是接收一个 **填充后** 的 `input` 张量，以及一个记录了 **真实长度** 的 `lengths` 列表。它会返回一个 `PackedSequence` 对象，可以把它想象成一个“压缩”后的数据包，其中所有的填充位都被暂时移除了。RNN 模块在接收到这个特殊对象后，其内部就能正确地、高效地处理变长序列。
+
+当然，有“打包”就有“解包”。与之对应的 `pad_packed_sequence` 函数则负责将 RNN 计算完成后的 `PackedSequence` 对象再“解压”还原成带有填充的、规整的 Tensor。
+
+#### 2.3.2 BiGRUNerNetWork 代码实现
+
+理解了“打包-解包”机制后，就可以动手改造 `GRUNerNetWork` 了。代码的主要改动如下：
 1.  **开启双向**：在 `nn.GRU` 的参数中设置 `bidirectional=True`。
-2.  **增加特征融合层**：由于双向 GRU 的输出维度会变为 `hidden_size * 2`，我们需要增加一个全连接层 `fc`，将拼接后的特征重新映射回 `hidden_size`，以便与输入进行残差连接。
+2.  **增加特征融合层**：由于双向 GRU 的输出维度会变为 `hidden_size * 2`，需要增加一个全连接层，将拼接后的特征重新映射回 `hidden_size`，以便与输入进行残差连接。
+3.  **集成 Pack/Pad**：在 `forward` 方法中，实现完整的“计算长度 -> 打包 -> GRU 计算 -> 解包 -> 残差连接”流程。
 
 ```python
 class BiGRUNerNetWork(nn.Module):
@@ -190,7 +237,7 @@ class BiGRUNerNetWork(nn.Module):
                     hidden_size=hidden_size,
                     num_layers=1,
                     batch_first=True,
-                    bidirectional=True
+                    bidirectional=True  # 开启双向
                 )
             )
         
@@ -201,108 +248,58 @@ class BiGRUNerNetWork(nn.Module):
         self.classifier = nn.Linear(hidden_size, num_tags)
 
     def forward(self, token_ids, attention_mask):
-        # [batch_size, seq_len] -> [batch_size, seq_len, hidden_size]
-        embedded_text = self.embedding(token_ids)
+        # 1. 计算真实长度
+        lengths = attention_mask.sum(dim=1).cpu()
 
-        current_input = embedded_text
-        for gru_layer in self.gru_layers:
-            gru_output, _ = gru_layer(current_input)
-            features = self.fc(gru_output)
-            # 添加残差连接
-            current_input = features + current_input
-
-        logits = self.classifier(current_input)
-        
-        return logits
-```
-
-### 2.4 核心代码讲解
-
-模型的主体框架已经搭建完成，其中有几个关键点需要深入理解。
-
-## 三、处理填充与变长序列 (进阶)
-
-在 `02_data_processing.md` 中，我们将每个批次的数据都填充（Padding）到了相同的长度。然而，这对于 **双向 RNN** 来说是一个潜在的“陷阱”。
-
--   **问题**：在反向传播时，RNN 会从序列的末尾开始处理。如果末尾都是无意义的 `<PAD>` 标记，那么这些填充信息会“污染”到序列中真实 Token 的表示。
--   **解决方案**：PyTorch 提供了一套优雅的工具——`pack_padded_sequence` 和 `pad_packed_sequence`，来解决这个问题。
-
-它们的工作流程如同“压缩”和“解压”：
-1.  **`pack_padded_sequence`**：在将数据送入 RNN 之前，根据每个样本的真实长度，将填充后的序列“压紧”，丢掉所有填充位。RNN 内部只会对这些压紧后的有效数据进行计算。
-2.  **`pad_packed_sequence`**：RNN 计算完成后，再用此函数将结果“解压”，恢复成填充后的形状，方便后续处理。
-
-### 3.1 在模型中集成 Pack/Pad
-
-我们需要修改 `forward` 方法来集成这个流程。同时，`forward` 方法也需要接收 `attention_mask` 来计算每个样本的真实长度。
-
-```python
-import torch
-import torch.nn as nn
-import torch.nn.utils.rnn as rnn
-
-class BiGRUNerNetWork(nn.Module):
-    def __init__(self, vocab_size, embedding_dim, hidden_size, num_tags, num_gru_layers=1):
-        super().__init__()
-        # 1. Token Embedding 层
-        self.embedding = nn.Embedding(vocab_size, embedding_dim)
-        
-        # 2. 动态特征提取层 (Encoder)
-        self.gru_layers = nn.ModuleList([
-            nn.GRU(
-                input_size=embedding_dim if i == 0 else hidden_size,
-                hidden_size=hidden_size,
-                num_layers=1,
-                batch_first=True,
-                bidirectional=True  # 开启双向
-            ) for i in range(num_gru_layers)
-        ])
-        
-        # 3. 分类决策层 (Classifier)
-        # 双向 GRU 的输出维度是 hidden_size 的两倍
-        self.bidirectional_fc = nn.Sequential(
-            nn.Linear(hidden_size * 2, hidden_size),
-            nn.ReLU()
-        )
-
-    def forward(self, token_ids, attention_mask):
-        # 1. 计算每个样本的真实长度
-        lengths = attention_mask.sum(dim=1)
-        
         # 2. 获取词向量
-        # [batch_size, seq_len] -> [batch_size, seq_len, embedding_dim]
         embedded_text = self.embedding(token_ids)
-
+        
         # 3. 打包序列
-        packed_embeddings = rnn.pack_padded_sequence(
-            embedded_text, 
-            lengths.cpu(),  # 长度必须是 CPU 上的 tensor
-            batch_first=True, 
-            enforce_sorted=False # 输入数据未按长度排序
+        current_packed_input = rnn.pack_padded_sequence(
+            embedded_text, lengths, batch_first=True, enforce_sorted=False
         )
         
-        # 4. 将打包后的序列送入 GRU
-        gru_input = packed_embeddings
+        # 4. 循环通过 GRU 层
         for gru_layer in self.gru_layers:
-            packed_gru_output, _ = gru_layer(gru_input)
-            gru_output = rnn.pad_packed_sequence(
-                packed_gru_output, 
-                batch_first=True
-            )[0] # 只取序列部分
-            gru_output = self.bidirectional_fc(gru_output)
-            gru_input = gru_output + gru_input # 残差连接
+            # GRU 输出 (packed)
+            packed_output, _ = gru_layer(current_packed_input)
+            
+            # 解包以进行后续操作，并指定 total_length
+            output, _ = rnn.pad_packed_sequence(
+                packed_output, batch_first=True, total_length=token_ids.shape[1]
+            )
+            
+            # 特征融合
+            features = self.fc(output)
+            
+            # 残差连接
+            # 同样需要解包上一层的输入
+            input_padded, _ = rnn.pad_packed_sequence(
+                current_packed_input, batch_first=True, total_length=token_ids.shape[1]
+            )
+            current_input = features + input_padded
+            
+            # 重新打包作为下一层的输入
+            current_packed_input = rnn.pack_padded_sequence(
+                current_input, lengths, batch_first=True, enforce_sorted=False
+            )
+            
+        # 5. 解包最终输出用于分类
+        final_output, _ = rnn.pad_packed_sequence(
+            current_packed_input, batch_first=True, total_length=token_ids.shape[1]
+        )
         
-        # 5. 分类
-        # [batch_size, seq_len, hidden_size * 2] -> [batch_size, seq_len, num_tags]
-        logits = self.classifier(gru_output)
+        # 6. 分类
+        logits = self.classifier(final_output)
         
         return logits
 ```
 
-通过这种方式，模型就能在不被填充位干扰的情况下，高效地处理变长序列。
+通过这番改造，`BiGRUNerNetWork` 才算是一个能够正确处理变长序列的、健壮的双向模型。
 
-## 四、训练流程封装
+## 三、封装训练流程 `Trainer`
 
-一个成熟的项目，其训练代码不应是零散的脚本，而应是结构化、可复用的框架。为此，我们设计一个 `Trainer` 类，将训练、评估、持久化等通用逻辑封装起来。
+一个成熟的项目，其训练代码不应是零散的脚本，而应是结构化、可复用的框架。从 `Trainer` 开始，我们将整个代码逻辑封装起来。
 
 ### 4.1 定义配置类
 
