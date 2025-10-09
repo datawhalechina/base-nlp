@@ -223,7 +223,7 @@ def pack_padded_sequence(
 
 ```python
 class BiGRUNerNetWork(nn.Module):
-    def __init__(self, vocab_size, hidden_size, num_tags, num_gru_layers=2):
+    def __init__(self, vocab_size, hidden_size, num_tags, num_gru_layers=1):
         super().__init__()
         # 1. Token Embedding 层
         self.embedding = nn.Embedding(vocab_size, hidden_size)
@@ -301,67 +301,79 @@ class BiGRUNerNetWork(nn.Module):
 
 一个成熟的项目，其训练代码不应是零散的脚本，而应是结构化、可复用的框架。为了将数据加载、模型构建、训练循环、评估、模型持久化等一系列操作有机地组织起来，来动手封装一个通用的 `Trainer` 类。
 
-我们的设计思路是采用 **模板方法模式**：
--   **定义框架**：在父类中定义好一套标准的训练“骨架”，规定好训练有哪些步骤、按什么顺序执行。
--   **填充细节**：在子类中，根据具体任务（如 NER）的特点，去实现“骨架”中需要定制化的部分（比如如何加载数据、构建具体模型等）。
+我们的设计思路是 **组件式组装** 与 **部门化分工**：
+
+-   **`Trainer` 只负责“训练”**: `Trainer` 类的核心职责是执行标准的训练和评估循环。它不关心模型是怎么构建的，也不关心数据是怎么加载的。
+-   **组件由外部创建并“注入”**: 模型、优化器、数据加载器等所有必要的组件都在外部被创建好，然后像零件一样被“注入”到 `Trainer` 的构造函数中。
+
+这种设计增强了代码的灵活性和可复用性。`Trainer` 可以与任何符合接口的模型和数据加载器配合使用。
 
 ### 3.1 搭建 Trainer 骨架
 
-首先定义 `Trainer` 类的基本结构。这个类应该包含训练的核心逻辑，比如训练/评估循环、模型保存等，同时也应该预留出一些需要由子类具体实现的方法。
+在开始编写 `Trainer` 类之前，先在项目中创建一个 `trainer` 目录，并在其中包含一个空的 `__init__.py` 文件（以将其声明为 Python 包）和一个 `trainer.py` 文件，用于存放 `Trainer` 类的定义。然后，定义 `Trainer` 类的基本结构。它通过构造函数接收所有必要的组件，并提供一个 `fit` 方法作为训练的统一入口。
 
 ```python
+import torch
+import os
 
 class Trainer:
-    def __init__(self, config):
-        pass
-
-    def _init_components(self):
-        """初始化所有训练组件，如模型、优化器、数据等"""
-        pass
-        
-    def build_dataloader(self, data_path, shuffle, device):
-        """由子类实现，告诉 Trainer 如何加载特定任务的数据"""
-        raise NotImplementedError
-
-    def build_model(self):
-        """由子类实现，告诉 Trainer 如何构建具体的模型"""
-        raise NotImplementedError
-
-    def build_optimizer(self):
-        """构建优化器，父类可提供默认实现"""
-        raise NotImplementedError
-
-    def build_loss_fn(self):
-        """构建损失函数，父类可提供默认实现"""
-        raise NotImplementedError
-
-    def build_eval_metric_fn(self):
+    def __init__(self, model, optimizer, loss_fn, train_loader, dev_loader=None, 
+                 eval_metric_fn=None, output_dir=None, device='cpu'):
         """
-        由子类实现，返回一个用于评估的函数。
-        该函数接收 logits 和 labels 作为输入，返回一个评估结果字典。
-        """
-        return None
+        初始化训练器。
         
-    def _train_one_epoch(self, epoch):
-        """封装一个 epoch 的训练逻辑"""
+        Args:
+            model: PyTorch 模型。
+            optimizer: 优化器。
+            loss_fn: 损失函数。
+            train_loader: 训练数据加载器。
+            dev_loader: 验证数据加载器。
+            eval_metric_fn: 评估函数。
+            output_dir: 模型输出目录。
+            device: 训练设备。
+        """
+        self.model = model.to(device)
+        self.optimizer = optimizer
+        self.loss_fn = loss_fn
+        self.train_loader = train_loader
+        self.dev_loader = dev_loader
+        self.eval_metric_fn = eval_metric_fn
+        self.output_dir = output_dir
+        self.device = torch.device(device)
+        
+        if self.output_dir:
+            os.makedirs(self.output_dir, exist_ok=True)
+
+    def fit(self, epochs):
+        """
+        训练的主入口，负责整个训练流程的调度。
+        """
         pass
 
-    def _evaluate(self, epoch):
-        """封装评估逻辑"""
+    def _train_one_epoch(self):
+        """封装一个 epoch 的训练逻辑。"""
+        pass
+    
+    def _train_step(self, batch):
+        """封装一个训练步骤的逻辑（前向、损失、反向）。"""
         pass
 
-    def _save_checkpoint(self, epoch, is_best=False):
-        """封装模型保存逻辑"""
+    def _evaluate(self):
+        """封装评估逻辑。"""
         pass
 
-    def train(self):
-        """训练的主入口，负责整个训练流程的调度"""
+    def _evaluation_step(self, batch):
+        """封装一个评估步骤的逻辑（前向、损失）。"""
+        pass
+
+    def _save_checkpoint(self, is_best=False):
+        """封装模型保存逻辑。"""
         pass
 ```
 
-### 3.2 引入配置类管理超参数
+### 3.2 引入配置类管理参数
 
-在搭建骨架时，很快会发现一个问题：整个训练流程依赖于大量的超参数。如果将这些参数作为独立的变量在代码中传来传去，会显得非常混乱且难以管理。
+在搭建骨架时，会发现整个流程依赖于大量的参数，包括文件路径、模型超参数和训练设置。如果将这些参数零散地分布在代码中，会显得非常混乱且难以管理。
 
 我们可以创建一个专门的 **配置类** 来统一管理所有这些参数。从最核心的几个参数开始定义：
 
@@ -373,150 +385,226 @@ import torch
 from dataclasses import dataclass, field
 
 @dataclass
-class TrainerConfig:
+class NerConfig:
     # --- 路径参数 ---
-    train_file: str = './data/CMeEE-V2_train.json'
-    dev_file: str = './data/CMeEE-V2_dev.json'
-    vocab_file: str = './data/vocabulary.json'
-    tags_file: str = './data/categories.json'
-    output_dir: str = './output_model'
+    data_dir: str = "./data"
+    train_file: str = "CMeEE-V2_train.json"
+    dev_file: str = "CMeEE-V2_dev.json"
+    vocab_file: str = "vocabulary.json"
+    tags_file: str = "categories.json"
+    output_dir: str = "./output_model_simplified"
 
     # --- 训练参数 ---
     batch_size: int = 32
     epochs: int = 20
     learning_rate: float = 1e-3
-    early_stop_epoch: int = 5
+    device: str = field(default_factory=lambda: 'cuda' if torch.cuda.is_available() else 'cpu')
     
     # --- 模型参数 ---
     hidden_size: int = 256
-    gru_num_layers: int = 2
-    
-    # --- 其他 ---
-    device: str = 'cuda' if torch.cuda.is_available() else 'cpu'
-    label_ignore_index: int = -100
+    num_gru_layers: int = 2
 ```
 
 > `@dataclass` 是 Python 3.7 引入的装饰器，可以简化类的编写。对于 `TrainerConfig` 这样的配置类，它会自动生成构造函数 (`__init__`)，无需再手动编写冗长的参数赋值代码。同时，它还会生成一个友好的打印格式 (`__repr__`)，这意味着 `print(config)` 会清晰地展示所有参数和值，便于调试。
 
 ### 3.3 完善 Trainer 类
 
-有了 `TrainerConfig`，就可以回过头来完善 `Trainer` 的代码。`Trainer` 在初始化时接收一个 `config` 对象，其内部所有方法都可以方便地从 `self.config` 中获取所需的参数。
+有了 `NerConfig`，就可以回过头来完善 `Trainer` 的代码。在我们当前的“组件式组装”设计中，虽然 `Trainer` 不直接接收整个 `config` 对象（以保持解耦），但 `config` 依然是所有“零件”的参数来源。
+
+接下来，填充 `Trainer` 类的完整实现，使其能够执行完整的训练和评估流程。
 
 ```python
 import torch
-import os
 from tqdm import tqdm
-import torch.nn as nn
+import os
+from utils.file_io import save_json
+from dataclasses import asdict
 
 class Trainer:
-    def __init__(self, config: TrainerConfig):
-        self.config = config
-        self._init_components()
-
-    def _init_components(self):
-        self.device = torch.device(self.config.device)
-
-        # 为获得更优的性能，建议在 Dataloader 内部（如 collate_fn）进行数据到 device 的转移
-        self.train_loader = self.build_dataloader(self.config.train_file, shuffle=True, device=self.device)
-        self.dev_loader = self.build_dataloader(self.config.dev_file, shuffle=False, device=self.device)
-
-        self.model = self.build_model().to(self.device)
-        self.optimizer = self.build_optimizer()
-        self.loss_fn = self.build_loss_fn()
-        self.eval_metric_fn = self.build_eval_metric_fn()
-
-    def build_dataloader(self, data_path, shuffle, device):
-        raise NotImplementedError
-
-    def build_model(self):
-        raise NotImplementedError
-
-    def build_optimizer(self):
-        return torch.optim.AdamW(self.model.parameters(), lr=self.config.learning_rate)
-
-    def build_loss_fn(self):
-        return nn.CrossEntropyLoss(ignore_index=self.config.label_ignore_index)
+    def __init__(self, model, optimizer, loss_fn, train_loader, dev_loader=None, 
+                 eval_metric_fn=None, output_dir=None, device='cpu'):
+        self.model = model.to(device)
+        self.optimizer = optimizer
+        self.loss_fn = loss_fn
+        self.train_loader = train_loader
+        self.dev_loader = dev_loader
+        self.eval_metric_fn = eval_metric_fn
+        self.output_dir = output_dir
+        self.device = torch.device(device)
         
-    def build_eval_metric_fn(self):
-        return None
+        if self.output_dir:
+            os.makedirs(self.output_dir, exist_ok=True)
+
+    def fit(self, epochs):
+        best_metric = float('inf')  # 初始化一个无穷大的 best_metric，用于后续比较
         
-    def _train_one_epoch(self, epoch):
-        self.model.train()
-        total_loss = 0
-        for batch in tqdm(self.train_loader, desc=f"Epoch {epoch}"):
-            # 约定 Dataloader 返回字典，包含模型所需的所有输入
-            logits = self.model(token_ids=batch['token_ids'], attention_mask=batch['attention_mask'])
-            loss = self.loss_fn(logits.permute(0, 2, 1), batch['label_ids'])
-            
-            self.optimizer.zero_grad()
-            loss.backward()
-            self.optimizer.step()
-            total_loss += loss.item()
-
-        return total_loss / len(self.train_loader)
-
-    def _evaluate(self, epoch):
-        if self.dev_loader is None or self.eval_metric_fn is None:
-            print("Validation dataloader or evaluation metric function is not available. Skipping evaluation.")
-            return None
-
-        self.model.eval()
-        all_logits = []
-        all_labels = []
-        total_loss = 0
-
-        with torch.no_grad():
-            for batch in tqdm(self.dev_loader, desc=f"Evaluating Epoch {epoch}"):
-                logits = self.model(token_ids=batch['token_ids'], attention_mask=batch['attention_mask'])
-                loss = self.loss_fn(logits.permute(0, 2, 1), batch['label_ids'])
-                total_loss += loss.item()
-
-                all_logits.append(logits.cpu())
-                all_labels.append(batch['label_ids'].cpu())
-        
-        # 将所有批次的 logits 和 labels 拼接起来，一次性计算评估指标
-        metrics = self.eval_metric_fn(all_logits, all_labels)
-        metrics['loss'] = total_loss / len(self.dev_loader)
-        
-        return metrics
-
-    def _save_checkpoint(self, epoch, is_best=False):
-        state = {'model_state_dict': self.model.state_dict()}
-        os.makedirs(self.config.output_dir, exist_ok=True)
-        
-        if is_best:
-            torch.save(state, os.path.join(self.config.output_dir, 'best_model.pth'))
-        torch.save(state, os.path.join(self.config.output_dir, 'last_model.pth'))
-
-    def train(self):
-        best_dev_loss = float('inf')
-        epochs_no_improve = 0
-        
-        for epoch in range(1, self.config.epochs + 1):
-            train_loss = self._train_one_epoch(epoch)
+        for epoch in range(1, epochs + 1):
+            # 1. 执行一个周期的训练
+            train_loss = self._train_one_epoch()
             print(f"Epoch {epoch} - Training Loss: {train_loss:.4f}")
 
-            metrics = self._evaluate(epoch)
+            # 2. 执行评估
+            metrics = self._evaluate()
             if metrics:
-                dev_loss = metrics['loss']
                 print(f"Epoch {epoch} - Validation Metrics: {metrics}")
+                current_metric = metrics.get('loss')  # 默认监控验证集 loss
                 
-                if dev_loss < best_dev_loss:
-                    best_dev_loss = dev_loss
-                    epochs_no_improve = 0
-                    self._save_checkpoint(epoch, is_best=True)
-                    print(f"New best model saved with validation loss: {best_dev_loss:.4f}")
-                else:
-                    epochs_no_improve += 1
+                # 3. 如果当前 metric 优于历史最优，则保存最佳模型
+                if current_metric < best_metric:
+                    best_metric = current_metric
+                    if self.output_dir:
+                        self._save_checkpoint(is_best=True)
+                        print(f"New best model saved with validation loss: {best_metric:.4f}")
 
-            self._save_checkpoint(epoch, is_best=False)
+            # 4. 每个 epoch 结束后，保存最新的模型状态
+            if self.output_dir:
+                self._save_checkpoint(is_best=False)
 
-            if epochs_no_improve >= self.config.early_stop_epoch:
-                print(f"Early stopping triggered after {epochs_no_improve} epochs without improvement.")
-                break
+    def _save_checkpoint(self, is_best):
+        """保存模型检查点。"""
+        state = {'model_state_dict': self.model.state_dict()}
+        if is_best:
+            # 保存最佳模型
+            torch.save(state, os.path.join(self.output_dir, 'best_model.pth'))
+        # 保存最新模型
+        torch.save(state, os.path.join(self.output_dir, 'last_model.pth'))
+
+    def _train_one_epoch(self):
+        """执行一个完整的训练周期。"""
+        self.model.train()  # 设置为训练模式
+        total_loss = 0
+        
+        # 使用 tqdm 显示进度条
+        for batch in tqdm(self.train_loader, desc=f"Training Epoch"):
+            outputs = self._train_step(batch)
+            total_loss += outputs['loss'].item()  # 累加 loss
+        
+        return total_loss / len(self.train_loader)  # 返回平均 loss
+
+    def _train_step(self, batch):
+        """执行单个训练步骤（前向、损失、反向）。"""
+        # 1. 将数据移动到指定设备
+        batch = {k: v.to(self.device) for k, v in batch.items() if isinstance(v, torch.Tensor)}
+
+        # 2. 模型前向传播
+        logits = self.model(token_ids=batch['token_ids'], attention_mask=batch['attention_mask'])
+        
+        # 3. 计算损失
+        # CrossEntropyLoss 要求 logits 的形状为 [B, C, L]，label_ids 的形状为 [B, L]
+        loss = self.loss_fn(logits.permute(0, 2, 1), batch['label_ids'])
+            
+        # 4. 反向传播与参数更新
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+        
+        return {'loss': loss, 'logits': logits}
+
+    def _evaluate(self):
+        """在验证集上执行评估。"""
+        if self.dev_loader is None:
+            return None
+
+        self.model.eval()  # 设置为评估模式
+        total_loss = 0
+        all_logits = []
+        all_labels = []
+        all_attention_mask = []
+
+        with torch.no_grad():  # 禁用梯度计算
+            for batch in tqdm(self.dev_loader, desc="Evaluating"):
+                outputs = self._evaluation_step(batch)
+                
+                total_loss += outputs['loss'].item()
+                # 收集所有批次的 logits 和 labels，用于后续评估
+                all_logits.append(outputs['logits'].cpu())
+                all_labels.append(batch['label_ids'].cpu())
+                all_attention_mask.append(batch['attention_mask'].cpu())
+        
+        metrics = {}
+        # 如果提供了评估函数，则调用它来计算指标
+        if self.eval_metric_fn:
+            metrics = self.eval_metric_fn(all_logits, all_labels, all_attention_mask)
+        
+        # 计算并记录平均 loss
+        metrics['loss'] = total_loss / len(self.dev_loader)
+        return metrics
+
+    def _evaluation_step(self, batch):
+        """执行单个评估步骤（前向、损失）。"""
+        # 1. 将数据移动到指定设备
+        batch = {k: v.to(self.device) for k, v in batch.items() if isinstance(v, torch.Tensor)}
+        
+        # 2. 模型前向传播
+        logits = self.model(token_ids=batch['token_ids'], attention_mask=batch['attention_mask'])
+        
+        # 3. 计算损失
+        loss = self.loss_fn(logits.permute(0, 2, 1), batch['label_ids'])
+        
+        return {'loss': loss, 'logits': logits}
 ```
 
-### 3.4 实现 NER 任务的 Trainer
+### 3.4 分离模型与训练器
+
+目前，模型的定义和训练的逻辑都耦合在一起。将它们分离开来能够得到可维护性更高的结构：
+
+-   **`model` 目录**: 用于存放网络架构的定义。例如，我们之前定义的 `GRUNerNetWork` 和 `BiGRUNerNetWork` 这类继承自 `nn.Module` 的类，就应该放在这里。它们只负责一件事：定义模型的计算图（`forward` 过程）。
+-   **`trainer` 目录**: 负责训练流程的管理。`Trainer` 基类和特定任务的 `NerTrainer` 子类放在这里。它们负责数据的加载、模型的调用、损失的计算、参数的更新等一系列流程化的工作。
+
+这种解耦的好处就是：
+1.  **模型与训练器解耦**：`Trainer` 不需要关心模型的具体实现，只需要知道模型有一个 `forward` 方法并返回 `logits` 即可。未来想试验新的模型（如 BERT、LSTM），只需在 `model` 目录下新增一个文件，然后在 `NerTrainer` 中切换引用的模型类，`Trainer` 的核心代码无需改动。
+2.  **提高代码可维护性**：项目结构一目了然。当需要修改模型时，直接去 `model` 目录；需要调整训练逻辑时，则去 `trainer` 目录。
+3.  **增强代码复用性**：`BiGRUNerNetWork` 模型可以被其他脚本（如一个单独的推理脚本）轻松导入和使用，而 `Trainer` 也可以被复用到其他序列标注任务中。
+
+因此，我们约定将模型代码存放在 `code/C8/model/ner_model.py` 文件中，然后在 `NerTrainer` 中通过 `from model.ner_model import BiGRUNerNetWork` 的方式来导入和使用。
+
+```python
+import torch
+import torch.nn as nn
+import torch.nn.utils.rnn as rnn
+
+class BiGRUNerNetWork(nn.Module):
+    def __init__(self, vocab_size, hidden_size, num_tags, num_gru_layers=1):
+        super().__init__()
+        self.embedding = nn.Embedding(vocab_size, hidden_size)
+        
+        self.gru_layers = nn.ModuleList()
+        for _ in range(num_gru_layers):
+            self.gru_layers.append(
+                nn.GRU(
+                    input_size=hidden_size,
+                    hidden_size=hidden_size,
+                    num_layers=1,
+                    batch_first=True,
+                    bidirectional=True
+                )
+            )
+        
+        self.fc = nn.Linear(2 * hidden_size, hidden_size)
+        self.classifier = nn.Linear(hidden_size, num_tags)
+
+    def forward(self, token_ids, attention_mask):
+        lengths = attention_mask.sum(dim=1).cpu()
+        embedded_text = self.embedding(token_ids)
+
+        current_input = embedded_text
+        for gru_layer in self.gru_layers:
+            packed_input = rnn.pack_padded_sequence(
+                current_input, lengths, batch_first=True, enforce_sorted=False
+            )
+            packed_output, _ = gru_layer(packed_input)
+            output, _ = rnn.pad_packed_sequence(
+                packed_output, batch_first=True, total_length=token_ids.shape[1]
+            )
+            
+            output = self.fc(output)
+            current_input = current_input + output
+
+        logits = self.classifier(current_input)
+        return logits
+```
+
+### 3.5 实现 NER 任务的 Trainer
 
 现在，我们创建一个 `NerTrainer` 继承自 `Trainer`，并实现其中未完成的 `build_dataloader` 和 `build_model` 方法，以“填充”那些特定于 NER 任务的细节。
 
@@ -594,7 +682,7 @@ class NerTrainer(Trainer):
         return compute_metrics
 ```
 
-### 3.5 启动训练脚本
+### 3.6 启动训练脚本
 
 最后，我们通过一个主脚本来实例化配置和 `Trainer`，并启动训练过程。这种写法让我们的主程序入口非常简洁。
 
