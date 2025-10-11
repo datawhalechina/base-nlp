@@ -23,11 +23,6 @@ class CharTokenizer(BaseTokenizer):
 
     def tokens_to_ids(self, tokens: list[str]):
         return self.vocab.convert_tokens_to_ids(tokens)
-    
-    def encode(self, text: str):
-        """Encodes a text string into a list of token IDs."""
-        tokens = self.text_to_tokens(text)
-        return self.tokens_to_ids(tokens)
 
     def get_pad_id(self) -> int:
         return self.vocab.pad_id

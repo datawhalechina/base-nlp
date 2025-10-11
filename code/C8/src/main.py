@@ -1,8 +1,9 @@
 import os
 import torch
 import torch.nn as nn
-from seqeval.metrics import f1_score, precision_score, recall_score, classification_report
 
+# 导入我们定义的所有组件
+from configs.configs import config
 from data.data_loader import create_ner_dataloader
 from tokenizer.vocabulary import Vocabulary
 from tokenizer.char_tokenizer import CharTokenizer
@@ -11,8 +12,10 @@ from trainer.trainer import Trainer
 from utils.file_io import load_json
 from metrics.entity_metrics import calculate_entity_level_metrics
 
-
-def run_ner_task(config):
+def main():
+    """
+    主函数，负责组装所有组件并启动NER训练任务。
+    """
     # --- 1. 加载词汇表和标签映射, 并创建分词器 ---
     vocab_path = os.path.join(config.data_dir, config.vocab_file)
     tags_path = os.path.join(config.data_dir, config.tags_file)
@@ -54,12 +57,10 @@ def run_ner_task(config):
     def eval_metric_fn(all_logits, all_labels, all_attention_mask):
         all_preds_ids = [torch.argmax(logits, dim=-1) for logits in all_logits]
         
-        # 将列表中的 tensors 移动到 cpu
         all_labels_cpu = [labels.cpu() for labels in all_labels]
         all_preds_ids_cpu = [preds.cpu() for preds in all_preds_ids]
         all_attention_mask_cpu = [mask.cpu() for mask in all_attention_mask]
         
-        # 展平 attention_mask，只保留有效部分
         active_masks = [mask.bool() for mask in all_attention_mask_cpu]
 
         metrics = calculate_entity_level_metrics(
@@ -82,4 +83,9 @@ def run_ner_task(config):
         device=config.device
     )
 
+    print("--- 配置已加载，开始执行NER任务 ---")
     trainer.fit(epochs=config.epochs)
+    print("--- NER任务执行完毕 ---")
+
+if __name__ == "__main__":
+    main()

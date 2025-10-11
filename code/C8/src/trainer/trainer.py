@@ -1,7 +1,6 @@
 import torch
 from tqdm import tqdm
 import os
-from utils.file_io import save_json
 from dataclasses import asdict
 
 class Trainer:

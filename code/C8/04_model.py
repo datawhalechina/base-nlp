@@ -3,8 +3,8 @@ import torch.nn as nn
 import torch.nn.utils.rnn as rnn
 
 class BiGRUNerNetWork(nn.Module):
-    def __init__(self, vocab_size, hidden_size, num_tags, num_gru_layers=2):
-        super().__init__()
+    def __init__(self, vocab_size, hidden_size, num_tags, num_gru_layers=1):
+        super(BiGRUNerNetWork).__init__()
         # 1. Token Embedding 层
         self.embedding = nn.Embedding(vocab_size, hidden_size)
 

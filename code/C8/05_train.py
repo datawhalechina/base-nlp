@@ -1,55 +1,91 @@
+import os
 import torch
-import json
-
-from _04_model import BiGRUForNer
-from _03_data_loader import Vocabulary, create_ner_dataloader
-from utils import Trainer, TrainerConfig
+import torch.nn as nn
+import sys
+# 导入定义的所有组件
+from src.configs.configs import config
+from src.data.data_loader import create_ner_dataloader
+from src.tokenizer.vocabulary import Vocabulary
+from src.tokenizer.char_tokenizer import CharTokenizer
+from src.models.ner_model import BiGRUNerNetWork
+from src.trainer.trainer import Trainer
+from src.utils.file_io import load_json
+from src.metrics.entity_metrics import calculate_entity_level_metrics
 
 def main():
-    # 1. 初始化配置
-    config = TrainerConfig()
+    """
+    主函数，负责组装所有组件并启动NER训练任务。
+    """
+    # --- 1. 加载词汇表和标签映射, 并创建分词器 ---
+    vocab_path = os.path.join(config.data_dir, config.vocab_file)
+    tags_path = os.path.join(config.data_dir, config.tags_file)
+    train_path = os.path.join(config.data_dir, config.train_file)
+    dev_path = os.path.join(config.data_dir, config.dev_file)
     
-    # 2. 加载通用资源 (词汇表, 标签映射)
-    vocab = Vocabulary(config.vocab_file)
-    with open(config.tags_file, 'r', encoding='utf-8') as f:
-        tag_map = json.load(f)
+    vocab = Vocabulary.load_from_file(vocab_path)
+    tokenizer = CharTokenizer(vocab)
+    tag_map = load_json(tags_path)
+    id2tag = {v: k for k, v in tag_map.items()}
 
-    # 3. 初始化数据加载器
+    # --- 2. 创建数据加载器 ---
     train_loader = create_ner_dataloader(
-        config.train_file, vocab, tag_map, config.batch_size, shuffle=True
+        data_path=train_path,
+        tokenizer=tokenizer,
+        tag_map=tag_map,
+        batch_size=config.batch_size,
+        shuffle=True,
+        device=config.device
     )
     dev_loader = create_ner_dataloader(
-        config.dev_file, vocab, tag_map, config.batch_size, shuffle=False
+        data_path=dev_path,
+        tokenizer=tokenizer,
+        tag_map=tag_map,
+        batch_size=config.batch_size,
+        shuffle=False,
+        device=config.device
     )
 
-    # 4. 初始化模型
-    model = BiGRUForNer(
+    # --- 3. 初始化模型、优化器、损失函数 ---
+    model = BiGRUNerNetWork(
         vocab_size=len(vocab),
-        embedding_dim=config.embedding_dim,
         hidden_size=config.hidden_size,
         num_tags=len(tag_map),
-        num_gru_layers=config.gru_num_layers
+        num_gru_layers=config.num_gru_layers
     )
+    optimizer = torch.optim.AdamW(model.parameters(), lr=config.learning_rate)
+    loss_fn = nn.CrossEntropyLoss(ignore_index=-100)
 
-    # 5. 初始化优化器和损失函数
-    optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
-    criterion = torch.nn.CrossEntropyLoss(ignore_index=config.label_ignore_index)
-    
-    # 6. 初始化 Trainer
+    # --- 4. 定义评估函数 ---
+    def eval_metric_fn(all_logits, all_labels, all_attention_mask):
+        all_preds_ids = [torch.argmax(logits, dim=-1) for logits in all_logits]
+        
+        all_labels_cpu = [labels.cpu() for labels in all_labels]
+        all_preds_ids_cpu = [preds.cpu() for preds in all_preds_ids]
+        all_attention_mask_cpu = [mask.cpu() for mask in all_attention_mask]
+        
+        active_masks = [mask.bool() for mask in all_attention_mask_cpu]
+
+        metrics = calculate_entity_level_metrics(
+            all_preds_ids_cpu, 
+            all_labels_cpu, 
+            active_masks, 
+            id2tag
+        )
+        return metrics
+
+    # --- 5. 初始化并启动训练器 ---
     trainer = Trainer(
         model=model,
+        optimizer=optimizer,
+        loss_fn=loss_fn,
         train_loader=train_loader,
         dev_loader=dev_loader,
-        optimizer=optimizer,
-        criterion=criterion,
-        device=torch.device(config.device),
-        epochs=config.epochs,
+        eval_metric_fn=eval_metric_fn,
         output_dir=config.output_dir,
-        early_stop_epoch=config.early_stop_epoch
+        device=config.device
     )
-    
-    # 7. 开始训练
-    trainer.train()
+
+    trainer.fit(epochs=config.epochs)
 
 if __name__ == "__main__":
     main()

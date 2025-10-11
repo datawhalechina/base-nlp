@@ -1,6 +1,6 @@
 import torch
 from torch.utils.data import Dataset
-from utils.file_io import load_json
+from ..utils.file_io import load_json
 
 
 class NerDataset(Dataset):

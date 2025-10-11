@@ -82,7 +82,7 @@ import torch.nn.utils.rnn as rnn
 
 class GRUNerNetWork(nn.Module):
     def __init__(self, vocab_size, hidden_size, num_tags, num_gru_layers=1):
-        super().__init__()
+        super(GRUNerNetWork).__init__()
         # 1. Token Embedding 层
         # 为了方便进行残差连接，embedding_dim 直接等于 hidden_size
         self.embedding = nn.Embedding(vocab_size, hidden_size)
@@ -224,7 +224,7 @@ def pack_padded_sequence(
 ```python
 class BiGRUNerNetWork(nn.Module):
     def __init__(self, vocab_size, hidden_size, num_tags, num_gru_layers=1):
-        super().__init__()
+        super(BiGRUNerNetWork).__init__()
         # 1. Token Embedding 层
         self.embedding = nn.Embedding(vocab_size, hidden_size)
         
@@ -310,9 +310,10 @@ class BiGRUNerNetWork(nn.Module):
 
 ### 3.1 搭建 Trainer 骨架
 
-在开始编写 `Trainer` 类之前，先在项目中创建一个 `trainer` 目录，并在其中包含一个空的 `__init__.py` 文件（以将其声明为 Python 包）和一个 `trainer.py` 文件，用于存放 `Trainer` 类的定义。然后，定义 `Trainer` 类的基本结构。它通过构造函数接收所有必要的组件，并提供一个 `fit` 方法作为训练的统一入口。
+在开始编写 `Trainer` 类之前，先在 `src/` 目录下创建一个 `trainer` 文件夹，并在其中新建一个 `trainer.py` 文件，用于存放 `Trainer` 类的定义。然后，定义 `Trainer` 类的基本结构。它通过构造函数接收所有必要的组件，并提供一个 `fit` 方法作为训练的统一入口。
 
 ```python
+# src/trainer/trainer.py
 import torch
 import os
 
@@ -381,18 +382,19 @@ class Trainer:
 -   **训练参数**：`batch_size`, `epochs`, `learning_rate` 等。
 
 ```python
+# src/configs/configs.py
 import torch
 from dataclasses import dataclass, field
 
 @dataclass
 class NerConfig:
     # --- 路径参数 ---
-    data_dir: str = "./data"
+    data_dir: str = "data"
     train_file: str = "CMeEE-V2_train.json"
     dev_file: str = "CMeEE-V2_dev.json"
     vocab_file: str = "vocabulary.json"
     tags_file: str = "categories.json"
-    output_dir: str = "./output_model_simplified"
+    output_dir: str = "output"
 
     # --- 训练参数 ---
     batch_size: int = 32
@@ -417,7 +419,6 @@ class NerConfig:
 import torch
 from tqdm import tqdm
 import os
-from utils.file_io import save_json
 from dataclasses import asdict
 
 class Trainer:
@@ -494,9 +495,9 @@ class Trainer:
         loss = self.loss_fn(logits.permute(0, 2, 1), batch['label_ids'])
             
         # 4. 反向传播与参数更新
-        self.optimizer.zero_grad()
-        loss.backward()
-        self.optimizer.step()
+            self.optimizer.zero_grad()
+            loss.backward()
+            self.optimizer.step()
         
         return {'loss': loss, 'logits': logits}
 
@@ -544,222 +545,522 @@ class Trainer:
         return {'loss': loss, 'logits': logits}
 ```
 
-### 3.4 分离模型与训练器
+### 3.4 实现模型组件
 
-目前，模型的定义和训练的逻辑都耦合在一起。将它们分离开来能够得到可维护性更高的结构：
+完成通用的 `Trainer` 类之后，接下来就是一步步地去构建传入 `__init__` 方法的各个组件。这里先来处理一下模型组件。
 
--   **`model` 目录**: 用于存放网络架构的定义。例如，我们之前定义的 `GRUNerNetWork` 和 `BiGRUNerNetWork` 这类继承自 `nn.Module` 的类，就应该放在这里。它们只负责一件事：定义模型的计算图（`forward` 过程）。
--   **`trainer` 目录**: 负责训练流程的管理。`Trainer` 基类和特定任务的 `NerTrainer` 子类放在这里。它们负责数据的加载、模型的调用、损失的计算、参数的更新等一系列流程化的工作。
+**第一步：创建模型目录**
 
-这种解耦的好处就是：
-1.  **模型与训练器解耦**：`Trainer` 不需要关心模型的具体实现，只需要知道模型有一个 `forward` 方法并返回 `logits` 即可。未来想试验新的模型（如 BERT、LSTM），只需在 `model` 目录下新增一个文件，然后在 `NerTrainer` 中切换引用的模型类，`Trainer` 的核心代码无需改动。
-2.  **提高代码可维护性**：项目结构一目了然。当需要修改模型时，直接去 `model` 目录；需要调整训练逻辑时，则去 `trainer` 目录。
-3.  **增强代码复用性**：`BiGRUNerNetWork` 模型可以被其他脚本（如一个单独的推理脚本）轻松导入和使用，而 `Trainer` 也可以被复用到其他序列标注任务中。
+在 `src/` 目录下创建一个新的文件夹 `models`。
 
-因此，我们约定将模型代码存放在 `code/C8/model/ner_model.py` 文件中，然后在 `NerTrainer` 中通过 `from model.ner_model import BiGRUNerNetWork` 的方式来导入和使用。
+**第二步：定义模型基类**
+
+在构建具体的模型之前，可以先在 `src/models/` 目录下创建一个 `base.py` 文件来定义一个 **模型基类**。这个基类使用 Python 的 `abc` 模块（Abstract Base Classes）来规定所有 NER 模型都必须遵循的一个统一接口。
+
+这样做的好处是：
+*   **强制接口统一**：所有模型都必须实现一个 `forward` 方法，且接收相同的参数（`token_ids`, `attention_mask`）。这保证了 `Trainer` 可以与任何我们未来创建的新模型（如 BERT-NER, LSTM-NER）无缝协作，无需修改 `Trainer` 的代码。
+*   **提高可读性与可维护性**：代码的结构更清晰，别人接手项目时，只需查看基类就能明白模型部分的接口规范。
 
 ```python
-import torch
+# src/models/base.py
+import torch.nn as nn
+from abc import ABC, abstractmethod
+
+class BaseNerNetwork(nn.Module, ABC):
+    @abstractmethod
+    def forward(self, token_ids, attention_mask):
+        """
+        定义所有 NER 模型都必须遵循的前向传播接口。
+        
+        Args:
+            token_ids (torch.Tensor): [batch_size, seq_len]
+            attention_mask (torch.Tensor): [batch_size, seq_len]
+
+        Returns:
+            torch.Tensor: Logits, [batch_size, seq_len, num_tags]
+        """
+        raise NotImplementedError
+```
+
+**第三步：实现具体的 NER 模型**
+
+接下来，在 `src/models` 文件夹中创建一个新的 Python 文件，命名为 `ner_model.py`。可以将之前实现的 `BiGRUNerNetWork` 模型的代码直接复制到 `ner_model.py` 文件中，并让它 **继承** 我们刚刚定义的 `BaseNerNetwork`。
+
+```python
+# src/models/ner_model.py
 import torch.nn as nn
 import torch.nn.utils.rnn as rnn
+from .base import BaseNerNetwork # 导入基类
 
-class BiGRUNerNetWork(nn.Module):
-    def __init__(self, vocab_size, hidden_size, num_tags, num_gru_layers=1):
-        super().__init__()
-        self.embedding = nn.Embedding(vocab_size, hidden_size)
-        
-        self.gru_layers = nn.ModuleList()
-        for _ in range(num_gru_layers):
-            self.gru_layers.append(
-                nn.GRU(
-                    input_size=hidden_size,
-                    hidden_size=hidden_size,
-                    num_layers=1,
-                    batch_first=True,
-                    bidirectional=True
-                )
-            )
-        
-        self.fc = nn.Linear(2 * hidden_size, hidden_size)
-        self.classifier = nn.Linear(hidden_size, num_tags)
-
-    def forward(self, token_ids, attention_mask):
-        lengths = attention_mask.sum(dim=1).cpu()
-        embedded_text = self.embedding(token_ids)
-
-        current_input = embedded_text
-        for gru_layer in self.gru_layers:
-            packed_input = rnn.pack_padded_sequence(
-                current_input, lengths, batch_first=True, enforce_sorted=False
-            )
-            packed_output, _ = gru_layer(packed_input)
-            output, _ = rnn.pad_packed_sequence(
-                packed_output, batch_first=True, total_length=token_ids.shape[1]
-            )
-            
-            output = self.fc(output)
-            current_input = current_input + output
-
-        logits = self.classifier(current_input)
-        return logits
+class BiGRUNerNetWork(BaseNerNetwork): # 继承自 BaseNerNetwork
+    # ... (省略具体实现，与前文一致) ...
 ```
 
-### 3.5 实现 NER 任务的 Trainer
+### 3.5 实现数据加载组件
 
-现在，我们创建一个 `NerTrainer` 继承自 `Trainer`，并实现其中未完成的 `build_dataloader` 和 `build_model` 方法，以“填充”那些特定于 NER 任务的细节。
+在模型结构确定之后，需要为 `Trainer` 准备数据加载器（`DataLoader`）这个组件。通常分为两步：
+1.  **创建 `Dataset`**：负责读取单条数据，并将其转换为模型所需的张量（Tensor）。
+2.  **创建 `DataLoader`**：从 `Dataset` 中批量、随机地抓取数据，并通过 `collate_fn` 函数将它们整理成一个规整的批次（Batch）。
 
-> **接口约定：Dataloader -> Trainer**
-> 
-> 为增强代码的健壮性和可扩展性，我们约定 `build_dataloader` 方法返回的 `DataLoader` 在迭代时，**必须 `yield` 一个字典**。字典的 `key` 必须与模型 `forward` 方法的参数名一致，如 `{'token_ids': ..., 'attention_mask': ..., 'label_ids': ...}`。
-> 
-> 这种方式比使用元组 `(ids, mask, labels)` 更优，因为未来若想增加新的模型输入（如 `token_type_ids`），只需在字典中新增一个键值对，而无需修改所有使用到数据的地方。
+**第一步：创建 NerDataset**
+
+在 `src/data/` 目录下创建一个 `dataset.py` 文件，用于定义 `NerDataset` 类。同样的我们只需要复制之前在 `03_data_loader.py` 中实现过的 `NerDataset` 类就行。
 
 ```python
-from data_loader import Vocabulary, create_ner_dataloader
+# src/data/dataset.py
+import torch
+from torch.utils.data import Dataset
 import json
-import numpy as np
 
-class NerTrainer(Trainer):
-    def __init__(self, config: TrainerConfig):
-        self.vocab = Vocabulary.load_from_file(config.vocab_file)
-        with open(config.tags_file, 'r', encoding='utf-8') as f:
-            self.tag_map = json.load(f)
-            self.id2tag = {v: k for k, v in self.tag_map.items()}
+class NerDataset(Dataset):
+    def __init__(self, data_path, tokenizer, tag_map):
+        self.tokenizer = tokenizer
+        self.tag_to_id = tag_map
         
-        super().__init__(config)
+        # 直接加载和解析 JSON 文件
+        with open(data_path, 'r', encoding='utf-8') as f:
+            self.records = json.load(f)
 
-    def build_dataloader(self, data_path, shuffle, device):
-        if data_path is None: return None
-        # 注意：此处需在 create_ner_dataloader 内部实现对 device 的支持
-        return create_ner_dataloader(
-            data_path,
-            vocab=self.vocab,
-            tag_map=self.tag_map,
-            batch_size=self.config.batch_size,
-            shuffle=shuffle,
-            device=device 
-        )
+    def __len__(self):
+        return len(self.records)
 
-    def build_model(self):
-        return BiGRUNerNetWork(
-            vocab_size=len(self.vocab),
-            hidden_size=self.config.hidden_size,
-            num_tags=len(self.tag_map),
-            num_gru_layers=self.config.gru_num_layers
-        )
+    def __getitem__(self, idx):
+        record = self.records[idx]
+        text = record['text']
+        tokens = self.tokenizer.text_to_tokens(text)
+        token_ids = self.tokenizer.tokens_to_ids(tokens)
 
-    def build_eval_metric_fn(self):
-        """
-        构建 NER 任务的评估函数。
+        tags = ['O'] * len(tokens)
+        for entity in record.get('entities', []):
+            entity_type = entity['type']
+            start = entity['start_idx']
+            end = entity['end_idx'] - 1
+
+            if end >= len(tokens): continue
+
+            if start == end:
+                tags[start] = f'S-{entity_type}'
+            else:
+                tags[start] = f'B-{entity_type}'
+                tags[end] = f'E-{entity_type}'
+                for i in range(start + 1, end):
+                    tags[i] = f'M-{entity_type}'
         
-        真实的评估会复杂得多，通常会使用 seqeval 等库来计算实体级别的 P/R/F1。
-        这里我们仅作一个简化的示例，计算 Token 级别的准确率，并返回符合 Trainer 要求的字典。
-        """
-        def compute_metrics(all_logits, all_labels):
-            # 将 list of tensors 拼接成一个大 tensor
-            logits = torch.cat(all_logits, dim=0)
-            labels = torch.cat(all_labels, dim=0)
-            
-            # 计算预测的 tag id
-            preds = torch.argmax(logits, dim=-1)
-            
-            # 过滤掉 padding 位置 (-100)
-            mask = labels != self.config.label_ignore_index
-            
-            # 计算准确率
-            correct = (preds[mask] == labels[mask]).sum().item()
-            total = mask.sum().item()
-            accuracy = correct / total if total > 0 else 0
-            
-            # 这是一个虚拟的 F1 分数，用于演示
-            f1_score = 0.9 * accuracy 
+        label_ids = [self.tag_to_id.get(tag, self.tag_to_id['O']) for tag in tags]
+
+        return {
+            "token_ids": torch.tensor(token_ids, dtype=torch.long),
+            "label_ids": torch.tensor(label_ids, dtype=torch.long)
+        }
+```
+
+**第二步：重构代码，封装通用函数**
+
+在 `NerDataset` 中，使用 `json.load` 来读取数据。但是，在项目中，可能会在多个地方都需要读取 JSON 文件（比如加载词汇表、加载配置文件等）。为了避免代码重复，并让代码更具可维护性，可以将这个文件读取的逻辑封装成一个通用的函数。
+
+在 `src/` 目录下创建一个 `utils` 文件夹，并在其中新建一个 `file_io.py` 文件。我们将在这里存放所有与文件读写相关的工具函数。
+
+```python
+# src/utils/file_io.py
+import json
+
+def load_json(file_path):
+    """从 JSON 文件加载数据。"""
+    with open(file_path, 'r', encoding='utf-8') as f:
+        return json.load(f)
+
+def save_json(data, file_path):
+    """将数据保存为 JSON 文件。"""
+    with open(file_path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
+```
+
+然后回头优化 `dataset.py` 的代码，让它使用新创建的 `load_json` 函数。
+
+```python
+# src/data/dataset.py
+import torch
+from torch.utils.data import Dataset
+from ..utils.file_io import load_json  # 导入封装好的函数
+
+class NerDataset(Dataset):
+    def __init__(self, data_path, tokenizer, tag_map):
+        self.tokenizer = tokenizer
+        self.tag_to_id = tag_map
+        self.records = load_json(data_path) # 调用通用函数，代码更简洁
+
+    # ... (省略 __len__ 和 __getitem__)
+```
+
+**第三步：创建 DataLoader**
+
+在 `src/data/` 目录下创建 `data_loader.py` 文件。复制 `create_ner_dataloader` 函数稍作调整来封装创建 `DataLoader` 的逻辑。
+
+```python
+# src/data/data_loader.py
+from torch.utils.data import DataLoader
+from torch.nn.utils.rnn import pad_sequence
+from .dataset import NerDataset
+
+def create_ner_dataloader(data_path, tokenizer, tag_map, batch_size, shuffle=False, device='cpu'):
+    dataset = NerDataset(data_path, tokenizer, tag_map)
+    
+    def collate_batch(batch):
+        token_ids_list = [item['token_ids'] for item in batch]
+        label_ids_list = [item['label_ids'] for item in batch]
+
+        padded_token_ids = pad_sequence(token_ids_list, batch_first=True, padding_value=tokenizer.get_pad_id())
+        padded_label_ids = pad_sequence(label_ids_list, batch_first=True, padding_value=-100)
+
+        attention_mask = (padded_token_ids != tokenizer.get_pad_id()).long()
 
             return {
-                "accuracy": accuracy,
-                "f1": f1_score
-            }
-        
-        return compute_metrics
+            "token_ids": padded_token_ids.to(device),
+            "label_ids": padded_label_ids.to(device),
+            "attention_mask": attention_mask.to(device)
+        }
+
+    return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, collate_fn=collate_batch)
 ```
 
-### 3.6 启动训练脚本
+### 3.6 实现分词器组件
 
-最后，我们通过一个主脚本来实例化配置和 `Trainer`，并启动训练过程。这种写法让我们的主程序入口非常简洁。
+至此，模型和数据加载器的结构都已就绪。但在 `NerDataset` 内部，还需要一个核心组件来处理原始文本：**分词器**。它的任务是将文本字符串，转换成模型能够理解的、由数字 ID 组成的序列。
+
+
+**第一步：定义分词器基类**
+
+与模型的设计类似，为分词器定义一个基类同样是一种推荐的做法，这能确保不同分词器实现之间接口的统一。在 `src/tokenizer/` 目录下创建 `base.py` 文件。这保证了我们未来可能创建的任何新分词器（例如基于 Jieba 的分词器）都会遵循相同的接口规范，从而可以与 `NerDataset` 无缝对接。
 
 ```python
-# main.py
-from trainer import NerTrainer, TrainerConfig # 假设上面的类保存在 trainer.py
+# src/tokenizer/base.py
+from abc import ABC, abstractmethod
+from typing import List
+
+class BaseTokenizer(ABC):
+    @abstractmethod
+    def text_to_tokens(self, text: str) -> List[str]:
+        """将文本分割成 token 列表。"""
+        raise NotImplementedError
+
+    @abstractmethod
+    def tokens_to_ids(self, tokens: List[str]) -> List[int]:
+        """将 token 列表转换为 ID 列表。"""
+        raise NotImplementedError
+
+    def encode(self, text: str) -> List[int]:
+        """将文本直接编码为 ID 列表的便捷方法。"""
+        tokens = self.text_to_tokens(text)
+        return self.tokens_to_ids(tokens)
+
+    @abstractmethod
+    def get_pad_id(self) -> int:
+        """获取填充 token 的 ID。"""
+        raise NotImplementedError
+```
+
+**第二步：实现字符级分词器**
+
+接下来，在 `src/tokenizer/` 目录下创建 `char_tokenizer.py`。将分词和词汇表管理的所有逻辑都放在这一个类里。
+
+```python
+# src/tokenizer/char_tokenizer.py
+from .base import BaseTokenizer
+from ..utils.file_io import load_json
+
+def normalize_text(text):
+    # ... (省略 normalize_text 函数实现) ...
+
+class CharTokenizer(BaseTokenizer):
+    def __init__(self, vocab_path: str):
+        # 词汇表管理
+        self.tokens = load_json(vocab_path)
+        self.token_to_id = {token: i for i, token in enumerate(self.tokens)}
+        self.id_to_token = {i: token for i, token in enumerate(self.tokens)}
+        self.pad_id = self.token_to_id['<PAD>']
+        self.unk_id = self.token_to_id['<UNK>']
+
+    def __len__(self):
+        return len(self.tokens)
+
+    def text_to_tokens(self, text: str):
+        normalized_text = normalize_text(text)
+        return list(normalized_text)
+
+    def tokens_to_ids(self, tokens: list[str]):
+        return [self.token_to_id.get(token, self.unk_id) for token in tokens]
+    
+    def get_pad_id(self) -> int:
+        return self.pad_id
+```
+
+**第三步：创建词汇表管理器**
+
+为了让代码结构更清晰，可以将词汇表管理的功能抽离出来，封装成一个独立的 `Vocabulary` 类。在 `src/tokenizer/` 目录下创建 `vocabulary.py` 文件，将之前 `CharTokenizer` 中 `__init__` 方法里的词汇表逻辑迁移过来。
+
+```python
+# src/tokenizer/vocabulary.py
+from ..utils.file_io import load_json
+
+class Vocabulary:
+    """
+    管理词汇表和 token 到 id 的映射。
+    """
+    def __init__(self, vocab_path):
+        self.tokens = load_json(vocab_path)
+        self.token_to_id = {token: i for i, token in enumerate(self.tokens)}
+        self.id_to_token = {i: token for i, token in enumerate(self.tokens)}
+        self.pad_id = self.token_to_id['<PAD>']
+        self.unk_id = self.token_to_id['<UNK>']
+
+    def __len__(self):
+        return len(self.tokens)
+
+    def convert_tokens_to_ids(self, tokens):
+        return [self.token_to_id.get(token, self.unk_id) for token in tokens]
+
+    @classmethod
+    def load_from_file(cls, vocab_path):
+        return cls(vocab_path)
+```
+
+**第四步：优化分词器**
+
+最后，我们回到 `char_tokenizer.py`，用新创建的 `Vocabulary` 类来重构它。可以看到，重构后的 `CharTokenizer` 将只负责分词。
+
+```python
+# src/tokenizer/char_tokenizer.py
+from .vocabulary import Vocabulary
+from .base import BaseTokenizer
+
+def normalize_text(text):
+    # ... (省略 normalize_text 函数实现) ...
+
+class CharTokenizer(BaseTokenizer):
+    def __init__(self, vocab: Vocabulary):
+        self.vocab = vocab
+
+    def text_to_tokens(self, text: str):
+        normalized_text = normalize_text(text)
+        return list(normalized_text)
+
+    def tokens_to_ids(self, tokens: list[str]):
+        return self.vocab.convert_tokens_to_ids(tokens)
+    
+    def get_pad_id(self) -> int:
+        return self.vocab.pad_id
+```
+
+### 3.7 实现评估指标组件
+
+对于 NER 任务，简单地计算每个 Token 的分类准确率是不够的。我们更关心的是模型作为一个整体，**能否准确地、完整地抽取出命名实体**。所以，需要计算实体级别（Entity-level）的指标：**精确率（Precision）、召回率（Recall）和 F1 值**。
+
+计算这些指标的流程如下：
+1.  **解码**：将模型预测出的标签 ID 序列（如 `[12, 13, 14, 0]`）转换回实体片段的列表（如 `[('dis', 0, 3)]`）。
+2.  **对比**：将预测出的实体列表与真实的实体列表进行比较。
+3.  **计算**：
+    *   **TP (True Positives)**：预测正确且与真实实体完全匹配（类型、起始和结束位置都相同）的实体数量。
+    *   **FP (False Positives)**：预测出的、但实际上不存在的实体数量。
+    *   **FN (False Negatives)**：真实存在、但模型未能预测出的实体数量。
+    *   **Precision** = TP / (TP + FP)
+    *   **Recall** = TP / (TP + FN)
+    *   **F1** = 2 * (Precision * Recall) / (Precision + Recall)
+
+新建 `src/metrics/` 目录并创建一个 `entity_metrics.py` 文件来实现这个逻辑。
+
+```python
+# src/metrics/entity_metrics.py
+import torch
+
+def _trans_entity2tuple(label_ids, id2tag):
+    """
+    将标签ID序列转换为实体元组列表。
+    一个实体元组示例: ('PER', 0, 2) -> (实体类型, 起始位置, 结束位置)
+    """
+    entities = []
+    current_entity = None
+
+    for i, label_id in enumerate(label_ids):
+        tag = id2tag.get(label_id.item(), 'O')
+
+        if tag.startswith('B-'):
+            # 如果遇到 B- 标签，说明一个新实体的开始
+            if current_entity:
+                entities.append(current_entity) # 先将上一个实体存起来
+            entity_type = tag[2:]
+            current_entity = (entity_type, i, i + 1)
+        elif tag.startswith('M-'):
+            # 如果遇到 M- 标签，说明当前实体在继续
+            if current_entity and current_entity[0] == tag[2:]:
+                current_entity = (current_entity[0], current_entity[1], i + 1)
+            else:
+                # 理论上 M- 标签前必须是 B- 或 M- 同类型标签，否则是标注错误
+                current_entity = None
+        elif tag.startswith('E-'):
+            # 如果遇到 E- 标签，说明实体结束
+            if current_entity and current_entity[0] == tag[2:]:
+                current_entity = (current_entity[0], current_entity[1], i + 1)
+                entities.append(current_entity)
+            current_entity = None
+        elif tag.startswith('S-'):
+            # 如果遇到 S- 标签，说明是一个单字实体
+            if current_entity:
+                entities.append(current_entity)
+            entity_type = tag[2:]
+            entities.append((entity_type, i, i + 1))
+            current_entity = None
+        else: # O 标签
+            # 如果遇到 O 标签，说明当前没有实体，或者实体已结束
+            if current_entity:
+                entities.append(current_entity)
+            current_entity = None
+            
+    # 防止最后一个实体没有被正确添加
+    if current_entity:
+        entities.append(current_entity)
+        
+    return set(entities)
+
+def calculate_entity_level_metrics(all_pred_ids, all_label_ids, all_masks, id2tag):
+    """
+    计算实体级别的精确率、召回率和 F1 分数。
+    """
+    # 过滤掉填充部分，只保留有效标签进行计算
+    active_preds = [p[m] for p, m in zip(all_pred_ids, all_masks)]
+    active_labels = [l[m] for l, m in zip(all_label_ids, all_masks)]
+
+    true_entities = set()
+    pred_entities = set()
+
+    for i in range(len(active_labels)):
+        # 为每个样本的实体添加一个唯一的样本 ID，以区分不同样本中的相同实体
+        # 最终元组格式: (样本ID, 实体类型, 起始位置, 结束位置)
+        sample_true_entities = {(i,) + entity for entity in _trans_entity2tuple(active_labels[i], id2tag)}
+        sample_pred_entities = {(i,) + entity for entity in _trans_entity2tuple(active_preds[i], id2tag)}
+        
+        true_entities.update(sample_true_entities)
+        pred_entities.update(sample_pred_entities)
+        
+    # 计算 TP, FP, FN
+    num_correct = len(true_entities.intersection(pred_entities)) # 预测正确且真实存在的 (TP)
+    num_true = len(true_entities)    # 所有真实存在的 (TP + FN)
+    num_pred = len(pred_entities)    # 所有预测出的 (TP + FP)
+
+    # 计算 P, R, F1
+    precision = num_correct / num_pred if num_pred > 0 else 0.0
+    recall = num_correct / num_true if num_true > 0 else 0.0
+    f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0.0
+
+    return {
+        "precision": precision,
+        "recall": recall,
+        "f1": f1
+    }
+```
+
+> 在 `calculate_entity_level_metrics` 中，为了能区分不同样本中的相同实体（例如，第一个样本的 `('dis', 0, 2)` 和第二个样本的 `('dis', 0, 2)`），在比较前为每个实体元组增加了一个样本 ID，使其变为 `(样本ID, 实体类型, 起始位置, 结束位置)`。这样可以确保比较的公平性。
+
+### 3.8 组装所有组件
+
+最后让我们组装刚才实现的各个组件。在根目录创建一个 `05_train.py` 文件，它将导入并组装我们在 `src/` 目录下构建的所有模块。
+
+```python
+# 05_train.py
+import os
+import torch
+import torch.nn as nn
+# 导入定义的所有组件
+from src.configs.configs import config
+from src.data.data_loader import create_ner_dataloader
+from src.tokenizer.vocabulary import Vocabulary
+from src.tokenizer.char_tokenizer import CharTokenizer
+from src.models.ner_model import BiGRUNerNetWork
+from src.trainer.trainer import Trainer
+from src.utils.file_io import load_json
+from src.metrics.entity_metrics import calculate_entity_level_metrics
 
 def main():
-    # 1. 初始化配置
-    # 可以在这里覆盖 config 的默认值
-    # 例如: config = TrainerConfig(batch_size=64, epochs=10)
-    config = TrainerConfig()
+    """
+    主函数，负责组装所有组件并启动NER训练任务。
+    """
+    # --- 1. 加载词汇表和标签映射, 并创建分词器 ---
+    vocab_path = os.path.join(config.data_dir, config.vocab_file)
+    tags_path = os.path.join(config.data_dir, config.tags_file)
+    train_path = os.path.join(config.data_dir, config.train_file)
+    dev_path = os.path.join(config.data_dir, config.dev_file)
     
-    # 2. 初始化 NerTrainer
-    trainer = NerTrainer(config)
-    
-    # 3. 开始训练
-    trainer.train()
+    vocab = Vocabulary.load_from_file(vocab_path)
+    tokenizer = CharTokenizer(vocab)
+    tag_map = load_json(tags_path)
+    id2tag = {v: k for k, v in tag_map.items()}
+
+    # --- 2. 创建数据加载器 ---
+    train_loader = create_ner_dataloader(
+        data_path=train_path,
+        tokenizer=tokenizer,
+        tag_map=tag_map,
+        batch_size=config.batch_size,
+        shuffle=True,
+        device=config.device
+    )
+    dev_loader = create_ner_dataloader(
+        data_path=dev_path,
+        tokenizer=tokenizer,
+        tag_map=tag_map,
+        batch_size=config.batch_size,
+        shuffle=False,
+        device=config.device
+    )
+
+    # --- 3. 初始化模型、优化器、损失函数 ---
+    model = BiGRUNerNetWork(
+        vocab_size=len(vocab),
+        hidden_size=config.hidden_size,
+        num_tags=len(tag_map),
+        num_gru_layers=config.num_gru_layers
+    )
+    optimizer = torch.optim.AdamW(model.parameters(), lr=config.learning_rate)
+    loss_fn = nn.CrossEntropyLoss(ignore_index=-100)
+
+    # --- 4. 定义评估函数 ---
+    def eval_metric_fn(all_logits, all_labels, all_attention_mask):
+        # 将模型输出的 logits 转换为预测的 tag id
+        all_preds_ids = [torch.argmax(logits, dim=-1) for logits in all_logits]
+        
+        # 将所有数据移动到 CPU 以便进行后续计算
+        all_labels_cpu = [labels.cpu() for labels in all_labels]
+        all_preds_ids_cpu = [preds.cpu() for preds in all_preds_ids]
+        all_attention_mask_cpu = [mask.cpu() for mask in all_attention_mask]
+        
+        # 将 attention_mask 转换为布尔类型，用于过滤 padding
+        active_masks = [mask.bool() for mask in all_attention_mask_cpu]
+
+        # 调用之前定义的评估函数
+        metrics = calculate_entity_level_metrics(
+            all_preds_ids_cpu, 
+            all_labels_cpu, 
+            active_masks, 
+            id2tag
+        )
+        return metrics
+
+    # --- 5. 初始化并启动训练器 ---
+    trainer = Trainer(
+        model=model,
+        optimizer=optimizer,
+        loss_fn=loss_fn,
+        train_loader=train_loader,
+        dev_loader=dev_loader,
+        eval_metric_fn=eval_metric_fn,
+        output_dir=config.output_dir,
+        device=config.device
+    )
+
+    # 启动训练
+    trainer.fit(epochs=config.epochs)
 
 if __name__ == "__main__":
     main()
 ```
 
-## 五、模型评估与推理
-
-### 5.1 评估指标
-
-对于 NER 任务，我们更关心 **实体级别** 的精确率 (Precision)、召回率 (Recall) 和 F1 值，而不是简单的 Token 准确率。评估流程如下：
-
-1.  **解码**：将模型输出的 `tag_ids` 序列转换回实体片段列表，如 `[(start, end, type), ...]`。
-2.  **对比**：将预测的实体列表与真实的实体列表进行对比。
-3.  **计算**：
-    -   **TP (True Positive)**：预测正确且与真实实体完全匹配的实体数量。
-    -   **FP (False Positive)**：预测出的、但实际不存在的（或不完全匹配的）实体数量。
-    -   **FN (False Negative)**：真实存在、但模型未能预测出的实体数量。
-    -   **Precision** = TP / (TP + FP)
-    -   **Recall** = TP / (TP + FN)
-    -   **F1** = 2 * (Precision * Recall) / (Precision + Recall)
-
-> 社区中有成熟的库（如 `seqeval`）可以方便地计算这些指标。
-
-### 5.2 推理
-
-当模型训练完成后，我们可以编写一个推理函数，对新的文本进行实体识别。
-
-```python
-# ... (需要加载 Vocabulary, tag_map, 和训练好的模型)
-
-class Predictor:
-    def __init__(self, model, vocab, tag_map, device):
-        self.model = model.to(device).eval()
-        self.vocab = vocab
-        # 创建 id -> tag 的逆向映射，方便解码
-        self.id_to_tag = {v: k for k, v in tag_map.items()}
-        self.device = device
-
-    def predict(self, text):
-        # 1. 文本预处理
-        tokens = list(text)
-        token_ids = self.vocab.convert_tokens_to_ids(tokens)
-        
-        # 2. 转换为 Tensor
-        input_tensor = torch.tensor([token_ids], dtype=torch.long).to(self.device)
-        mask = (input_tensor != self.vocab.pad_id).long()
-
-        # 3. 模型推理
-        with torch.no_grad():
-            logits = self.model(input_tensor, mask)
-        
-        # 4. 解码
-        pred_tag_ids = logits.argmax(dim=-1).squeeze(0).cpu().numpy()
-        pred_tags = [self.id_to_tag[tid] for tid in pred_tag_ids]
-        
-        # 5. 将标签序列转换为实体
-        # ... (解码逻辑，将 BMES 标签转换为实体片段)
-        
-        return entities
-```
-
-至此，我们已经完整地构建了从数据处理、模型构建、训练封装到最终评估和推理的整个 NER 项目流程。
+现在我们已经完整地构建了从数据处理、模型构建、训练封装到最终评估和推理的整个 NER 项目流程。在 `code/C8/` 目录下，通过 `python 05_train.py` 命令，就可以启动整个训练过程。

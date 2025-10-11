@@ -1,9 +1,6 @@
-import json
-import torch
 from torch.utils.data import DataLoader
 from torch.nn.utils.rnn import pad_sequence
 from .dataset import NerDataset
-from tokenizer.vocabulary import Vocabulary
 
 
 def create_ner_dataloader(data_path, tokenizer, tag_map, batch_size, shuffle=False, device='cpu'):
