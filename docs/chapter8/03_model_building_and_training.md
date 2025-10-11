@@ -82,7 +82,7 @@ import torch.nn.utils.rnn as rnn
 
 class GRUNerNetWork(nn.Module):
     def __init__(self, vocab_size, hidden_size, num_tags, num_gru_layers=1):
-        super(GRUNerNetWork).__init__()
+        super().__init__()
         # 1. Token Embedding 层
         # 为了方便进行残差连接，embedding_dim 直接等于 hidden_size
         self.embedding = nn.Embedding(vocab_size, hidden_size)
@@ -224,7 +224,7 @@ def pack_padded_sequence(
 ```python
 class BiGRUNerNetWork(nn.Module):
     def __init__(self, vocab_size, hidden_size, num_tags, num_gru_layers=1):
-        super(BiGRUNerNetWork).__init__()
+        super().__init__()
         # 1. Token Embedding 层
         self.embedding = nn.Embedding(vocab_size, hidden_size)
         

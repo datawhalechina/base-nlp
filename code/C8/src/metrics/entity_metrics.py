@@ -1,4 +1,3 @@
-import torch
 
 def _trans_entity2tuple(label_ids, id2tag):
     """

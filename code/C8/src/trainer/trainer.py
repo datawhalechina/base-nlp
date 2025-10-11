@@ -1,7 +1,6 @@
 import torch
 from tqdm import tqdm
 import os
-from dataclasses import asdict
 
 class Trainer:
     def __init__(self, model, optimizer, loss_fn, train_loader, dev_loader=None, 
@@ -14,6 +13,7 @@ class Trainer:
         self.eval_metric_fn = eval_metric_fn
         self.output_dir = output_dir
         self.device = torch.device(device)
+        print(f"Trainer will run on device: {self.device}")
         
         if self.output_dir:
             os.makedirs(self.output_dir, exist_ok=True)
@@ -54,6 +54,7 @@ class Trainer:
         return total_loss / len(self.train_loader)
 
     def _train_step(self, batch):
+        batch = {k: v.to(self.device) for k, v in batch.items() if isinstance(v, torch.Tensor)}
         logits = self.model(token_ids=batch['token_ids'], attention_mask=batch['attention_mask'])
         loss = self.loss_fn(logits.permute(0, 2, 1), batch['label_ids'])
         
@@ -89,6 +90,7 @@ class Trainer:
         return metrics
 
     def _evaluation_step(self, batch):
+        batch = {k: v.to(self.device) for k, v in batch.items() if isinstance(v, torch.Tensor)}
         logits = self.model(token_ids=batch['token_ids'], attention_mask=batch['attention_mask'])
         loss = self.loss_fn(logits.permute(0, 2, 1), batch['label_ids'])
         return {'loss': loss, 'logits': logits}

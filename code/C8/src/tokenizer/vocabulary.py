@@ -1,5 +1,5 @@
 import json
-from utils.file_io import load_json
+from ..utils.file_io import load_json
 
 class Vocabulary:
     """

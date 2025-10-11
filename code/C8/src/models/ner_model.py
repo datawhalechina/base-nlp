@@ -5,7 +5,7 @@ from .base import BaseNerNetwork
 
 class BiGRUNerNetWork(BaseNerNetwork):
     def __init__(self, vocab_size, hidden_size, num_tags, num_gru_layers=1):
-        super(BiGRUNerNetWork, self).__init__()
+        super().__init__()  # 必须在第一行调用父类的__init__方法
         self.embedding = nn.Embedding(vocab_size, hidden_size)
         
         self.gru_layers = nn.ModuleList()
