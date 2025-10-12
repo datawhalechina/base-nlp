@@ -3,7 +3,7 @@ import os
 from collections import Counter
 
 
-def save_json_pretty(data, file_path):
+def save_json(data, file_path):
     """
     将数据以易于阅读的格式保存为 JSON 文件。
     """
@@ -47,7 +47,7 @@ def create_char_vocab(data_files, output_file, min_freq=1):
     print(f"词汇表大小 (min_freq={min_freq}): {len(final_vocab_list)}")
 
     # 保存词汇表
-    save_json_pretty(final_vocab_list, output_file)
+    save_json(final_vocab_list, output_file)
     print(f"词汇表已保存至: {output_file}")
 
 

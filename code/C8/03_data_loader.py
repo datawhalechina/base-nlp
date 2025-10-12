@@ -32,7 +32,7 @@ class Vocabulary:
         return [self.token_to_id.get(token, self.unk_id) for token in tokens]
 
 
-class NerDataProcessor(Dataset):
+class NerDataset(Dataset):
     """
     处理 NER 数据，并将其转换为适用于 PyTorch 模型的格式。
     """
@@ -71,11 +71,11 @@ class NerDataProcessor(Dataset):
                     tags[i] = f'M-{entity_type}'
         
         # 将标签转换为 ids
-        tag_ids = [self.tag_to_id[tag] for tag in tags]
+        label_ids = [self.tag_to_id[tag] for tag in tags]
 
         return {
             "token_ids": torch.tensor(token_ids, dtype=torch.long),
-            "tag_ids": torch.tensor(tag_ids, dtype=torch.long)
+            "label_ids": torch.tensor(label_ids, dtype=torch.long)
         }
 
 
@@ -83,18 +83,22 @@ def create_ner_dataloader(data_path, vocab, tag_map, batch_size, shuffle=False):
     """
     创建 NER 任务的 DataLoader。
     """
-    dataset = NerDataProcessor(data_path, vocab, tag_map)
+    dataset = NerDataset(data_path, vocab, tag_map)
     
     def collate_batch(batch):
         token_ids_list = [item['token_ids'] for item in batch]
-        tag_ids_list = [item['tag_ids'] for item in batch]
+        label_ids_list = [item['label_ids'] for item in batch]
 
         padded_token_ids = pad_sequence(token_ids_list, batch_first=True, padding_value=vocab.pad_id)
-        padded_tag_ids = pad_sequence(tag_ids_list, batch_first=True, padding_value=-100) # -100 用于在计算损失时忽略填充部分
+        padded_label_ids = pad_sequence(label_ids_list, batch_first=True, padding_value=-100)  # -100 用于在计算损失时忽略填充部分
 
         attention_mask = (padded_token_ids != vocab.pad_id).long()
 
-        return padded_token_ids, padded_tag_ids, attention_mask
+        return {
+            "token_ids": padded_token_ids,
+            "label_ids": padded_label_ids,
+            "attention_mask": attention_mask
+        }
 
     return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, collate_fn=collate_batch)
 
@@ -123,11 +127,11 @@ if __name__ == '__main__':
 
     # 3. 验证一个批次的数据
     print("\n--- 验证一个批次的数据 ---")
-    tokens, labels, mask = next(iter(train_loader))
+    batch = next(iter(train_loader))
     
-    print(f"  Token IDs (shape): {tokens.shape}")
-    print(f"  Label IDs (shape): {labels.shape}")
-    print(f"  Attention Mask (shape): {mask.shape}")
-    print(f"  Token IDs (sample): {tokens[0][:20]}...")
-    print(f"  Label IDs (sample): {labels[0][:20]}...")
-    print(f"  Attention Mask (sample): {mask[0][:20]}...")
+    print(f"  Token IDs (shape): {batch['token_ids'].shape}")
+    print(f"  Label IDs (shape): {batch['label_ids'].shape}")
+    print(f"  Attention Mask (shape): {batch['attention_mask'].shape}")
+    print(f"  Token IDs (sample): {batch['token_ids'][0][:20]}...")
+    print(f"  Label IDs (sample): {batch['label_ids'][0][:20]}...")
+    print(f"  Attention Mask (sample): {batch['attention_mask'][0][:20]}...")

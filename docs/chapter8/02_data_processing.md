@@ -376,7 +376,7 @@ if __name__ == '__main__':
 
 所以我们将整个流程拆分为以下几个步骤来逐步实现：
 -   **步骤一：封装 `Vocabulary` 类**，专门负责 Token 和 ID 之间的转换。
--   **步骤二：创建 `NerDataProcessor`**，继承自 PyTorch 的 `Dataset`，负责处理单个数据样本的转换。
+-   **步骤二：创建 `NerDataset`**，继承自 PyTorch 的 `Dataset`，负责处理单个数据样本的转换。
 -   **步骤三：定义 `collate_fn` 函数**，负责将多个样本打包、填充成一个 batch。
 -   **步骤四：整合所有组件**，创建一个 `DataLoader` 实例并进行测试。
 
@@ -410,9 +410,9 @@ if __name__ == '__main__':
     print(f"词汇表大小: {len(vocabulary)}")
 ```
 
-### 4.2 创建 NerDataProcessor (Dataset)
+### 4.2 创建 NerDataset
 
-现在要是核心的数据集类，它继承了 `torch.utils.data.Dataset`。负责将单条原始数据转换为模型所需的 `token_ids` 和 `tag_ids`。可以把它想象成一个数据处理的“单件工厂”，`DataLoader` 每次需要数据时，都会向这个工厂索要一件（`__getitem__`）加工好的产品。
+现在要创建的是核心的数据集类，它继承了 `torch.utils.data.Dataset`。负责将单条原始数据转换为模型所需的 `token_ids` 和 `label_ids`。可以把它想象成一个数据处理的“单件工厂”，`DataLoader` 每次需要数据时，都会向这个工厂索要一件（`__getitem__`）加工好的产品。
 
 ```python
 # ... 
@@ -422,7 +422,7 @@ from torch.utils.data import Dataset
 class Vocabulary:
     # ... (类已在前面定义，此处省略)
 
-class NerDataProcessor(Dataset):
+class NerDataset(Dataset):
     def __init__(self, data_path, vocab: Vocabulary, tag_map: dict):
         # 一次性将整个 JSON 文件（一个大列表）读入内存
         self.vocab = vocab
@@ -461,13 +461,13 @@ class NerDataProcessor(Dataset):
                 for i in range(start + 1, end):
                     tags[i] = f'M-{entity_type}' # 实体中间
 
-        # 5. 将 BMES 标签字符串序列转换为 tag_ids
-        tag_ids = [self.tag_to_id[tag] for tag in tags]
+        # 5. 将 BMES 标签字符串序列转换为 label_ids
+        label_ids = [self.tag_to_id[tag] for tag in tags]
 
         # 6. 返回包含两个 Tensor 的字典
         return {
             "token_ids": torch.tensor(token_ids, dtype=torch.long),
-            "tag_ids": torch.tensor(tag_ids, dtype=torch.long)
+            "label_ids": torch.tensor(label_ids, dtype=torch.long)
         }
 
 if __name__ == '__main__':
@@ -481,7 +481,7 @@ if __name__ == '__main__':
         tag_map = json.load(f)
         
     # 创建数据集实例
-    train_dataset = NerDataProcessor(train_file, vocabulary, tag_map)
+    train_dataset = NerDataset(train_file, vocabulary, tag_map)
     print(f"数据集大小: {len(train_dataset)}")
 ```
 
@@ -501,17 +501,21 @@ from torch.nn.utils.rnn import pad_sequence
 # ... (省略前面所有的类和函数定义) ...
 
 def create_ner_dataloader(data_path, vocab, tag_map, batch_size, shuffle=False):
-    dataset = NerDataProcessor(data_path, vocab, tag_map)
+    dataset = NerDataset(data_path, vocab, tag_map)
     
     def collate_batch(batch):
         token_ids_list = [item['token_ids'] for item in batch]
-        tag_ids_list = [item['tag_ids'] for item in batch]
+        label_ids_list = [item['label_ids'] for item in batch]
 
         padded_token_ids = pad_sequence(token_ids_list, batch_first=True, padding_value=vocab.pad_id)
-        padded_tag_ids = pad_sequence(tag_ids_list, batch_first=True, padding_value=-100)
+        padded_label_ids = pad_sequence(label_ids_list, batch_first=True, padding_value=-100)
         attention_mask = (padded_token_ids != vocab.pad_id).long()
 
-        return padded_token_ids, padded_tag_ids, attention_mask
+        return {
+            "token_ids": padded_token_ids,
+            "label_ids": padded_label_ids,
+            "attention_mask": attention_mask
+        }
 
     return DataLoader(
         dataset,
@@ -541,12 +545,12 @@ if __name__ == '__main__':
     )
 
     # 3. 验证一个批次的数据
-    tokens, labels, mask = next(iter(train_loader))
+    batch = next(iter(train_loader))
     
     print("\n--- DataLoader 输出验证 ---")
-    print(f"  Token IDs shape: {tokens.shape}")
-    print(f"  Label IDs shape: {labels.shape}")
-    print(f"  Attention Mask shape: {mask.shape}")
+    print(f"  Token IDs shape: {batch['token_ids'].shape}")
+    print(f"  Label IDs shape: {batch['label_ids'].shape}")
+    print(f"  Attention Mask shape: {batch['attention_mask'].shape}")
 ```
 
 `torch.utils.data.DataLoader` 是 PyTorch 的核心数据加载工具，它像一个高度自动化的“数据供应管道”。将 `NerDataProcessor` 实例（`dataset`）作为数据源传入，并配置了几个关键参数：
