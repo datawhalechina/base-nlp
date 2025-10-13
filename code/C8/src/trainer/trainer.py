@@ -39,12 +39,6 @@ class Trainer:
             if self.output_dir:
                 self._save_checkpoint(is_best=False)
 
-    def _save_checkpoint(self, is_best):
-        state = {'model_state_dict': self.model.state_dict()}
-        if is_best:
-            torch.save(state, os.path.join(self.output_dir, 'best_model.pth'))
-        torch.save(state, os.path.join(self.output_dir, 'last_model.pth'))
-
     def _train_one_epoch(self):
         self.model.train()
         total_loss = 0
@@ -94,3 +88,9 @@ class Trainer:
         logits = self.model(token_ids=batch['token_ids'], attention_mask=batch['attention_mask'])
         loss = self.loss_fn(logits.permute(0, 2, 1), batch['label_ids'])
         return {'loss': loss, 'logits': logits}
+
+    def _save_checkpoint(self, is_best):
+        state = {'model_state_dict': self.model.state_dict()}
+        if is_best:
+            torch.save(state, os.path.join(self.output_dir, 'best_model.pth'))
+        torch.save(state, os.path.join(self.output_dir, 'last_model.pth'))
