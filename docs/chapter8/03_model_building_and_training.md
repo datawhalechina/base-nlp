@@ -919,6 +919,44 @@ def _trans_entity2tuple(label_ids, id2tag):
         
     return set(entities)
 
+def calculate_entity_level_metrics(all_pred_ids, all_label_ids, id2tag):
+    true_entities = set()
+    pred_entities = set()
+
+    # 遍历批次中的每一个样本
+    for i in range(len(all_label_ids)):
+        sample_true_entities = _trans_entity2tuple(all_label_ids[i], id2tag)
+        sample_pred_entities = _trans_entity2tuple(all_pred_ids[i], id2tag)
+        
+        true_entities.update(sample_true_entities)
+        pred_entities.update(sample_pred_entities)
+        
+    num_correct = len(true_entities.intersection(pred_entities))
+    num_true = len(true_entities)
+    num_pred = len(pred_entities)
+
+    precision = num_correct / num_pred if num_pred > 0 else 0.0
+    recall = num_correct / num_true if num_true > 0 else 0.0
+    f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0.0
+
+    return {"precision": precision, "recall": recall, "f1": f1}
+```
+
+> **批量评估中的挑战与解决方案：**
+>
+> 当前 `calculate_entity_level_metrics` 的实现，在面对 `Trainer` 的批量评估场景时，会遇到两个问题：
+>
+> 1.  **处理填充**：在一个批次中，不同长度的句子会被填充到相同长度。这些填充位（Padding）不应参与评估。我们需要利用 `attention_mask` 机制，来过滤掉所有因填充而产生的无效 Token，确保评估只在有效的序列片段上进行。
+>
+> 2.  **追踪样本来源**：当处理一个批次的多个样本时，必须能区分每个实体到底来自哪个样本。例如，批次中的第一个样本和第二个样本可能在相同的位置 `(0, 2)` 都有一个 `'dis'` 类型的实体。如果在解码时不加以区分，这两个独立的实体在存入 `set` 时会被误判为同一个。为了准确区分来自同一批次中不同样本的实体，设计了一种方案：为每个解码出的实体附加其所在样本的唯一ID（即批次内索引 `i`）。确保每个实体都由一个唯一的 `(样本ID, 实体类型, 起始位置, 结束位置)` 四元组来标识，从根本上解决实体归属混淆的问题。
+>
+> 改进后的 `calculate_entity_level_metrics` 函数实现如下：
+
+```python
+# src/metrics/entity_metrics.py
+
+# _trans_entity2tuple 函数同上，此处省略...
+
 def calculate_entity_level_metrics(all_pred_ids, all_label_ids, all_masks, id2tag):
     """
     计算实体级别的精确率、召回率和 F1 分数。
@@ -956,7 +994,6 @@ def calculate_entity_level_metrics(all_pred_ids, all_label_ids, all_masks, id2ta
     }
 ```
 
-> 在 `calculate_entity_level_metrics` 中，为了能区分不同样本中的相同实体（例如，第一个样本的 `('dis', 0, 2)` 和第二个样本的 `('dis', 0, 2)`），在比较前为每个实体元组增加了一个样本 ID，使其变为 `(样本ID, 实体类型, 起始位置, 结束位置)`。这样可以确保比较的公平性。
 
 ### 3.8 组装所有组件
 
@@ -1062,3 +1099,5 @@ if __name__ == "__main__":
 ```
 
 现在我们就完整地构建了从数据处理、模型构建、训练封装到最终评估和推理的整个 NER 项目流程。在 `code/C8/` 目录下，通过 `python 05_train.py` 命令，就可以启动整个训练过程。
+
+```
