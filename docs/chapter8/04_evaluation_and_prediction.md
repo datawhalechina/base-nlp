@@ -168,7 +168,7 @@ def _extract_entities(self, tokens, tags):
     -   创建 `attention_mask`。
     -   将所有张量移动到 `self.device`。
 2.  **模型预测**:
-    -   使用 `with torch.no_grad():` 上下文管理器。这会临时禁用梯度计算，能显著减少内存消耗并加速推理过程。
+    -   使用 `with torch.no_grad():` 临时禁用梯度计算，减少内存消耗并加速推理过程。
     -   将 `token_ids` 和 `attention_mask` 送入模型，得到 `logits`。
 3.  **后处理**:
     -   对 `logits` 在最后一个维度上执行 `argmax`，得到预测的 `label_ids` 序列。
