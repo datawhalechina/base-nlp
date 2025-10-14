@@ -2,10 +2,10 @@ import torch
 import json
 import os
 import argparse
-from models.ner_model import BiGRUNerNetWork
-from tokenizer.vocabulary import Vocabulary
-from tokenizer.char_tokenizer import CharTokenizer
-from utils.file_io import load_json
+from src.models.ner_model import BiGRUNerNetWork
+from src.tokenizer.vocabulary import Vocabulary
+from src.tokenizer.char_tokenizer import CharTokenizer
+from src.utils.file_io import load_json
 
 
 class NerPredictor:
@@ -60,33 +60,35 @@ class NerPredictor:
         current_entity = None
         for i, tag in enumerate(tags):
             if tag.startswith('B-'):
+                # 如果前一个实体未正确结束，则放弃
                 if current_entity:
-                    entities.append(current_entity)
+                    pass # 或者可以根据业务逻辑决定是否保存不完整的实体
                 current_entity = {"text": tokens[i], "type": tag[2:], "start": i}
             elif tag.startswith('M-'):
+                # M 标签必须跟在 B- 或 M- 之后
                 if current_entity and current_entity["type"] == tag[2:]:
                     current_entity["text"] += tokens[i]
-                else: # 非法 M 标签
+                else:
+                    # 非法 M 标签，重置当前实体
                     current_entity = None
-            elif tag.startswith('S-'):
-                if current_entity:
-                    entities.append(current_entity)
-                entities.append({"text": tokens[i], "type": tag[2:], "start": i, "end": i + 1})
-                current_entity = None
             elif tag.startswith('E-'):
+                # E 标签必须跟在 B- 或 M- 之后
                 if current_entity and current_entity["type"] == tag[2:]:
                     current_entity["text"] += tokens[i]
                     current_entity["end"] = i + 1
                     entities.append(current_entity)
+                # 实体已结束，重置
                 current_entity = None
-            else: # 'O'
-                if current_entity:
-                    entities.append(current_entity)
+            elif tag.startswith('S-'):
+                # S 标签表示单个字符的实体
+                # 如果有未结束的实体，则放弃
+                current_entity = None
+                entities.append({"text": tokens[i], "type": tag[2:], "start": i, "end": i + 1})
+            else: # 'O' 标签
+                # O 标签意味着没有实体，或者实体已经结束
                 current_entity = None
         
-        if current_entity:
-            entities.append(current_entity)
-
+        # 循环结束后，不再处理任何未闭合的实体
         return entities
 
 def main():

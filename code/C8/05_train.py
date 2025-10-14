@@ -2,6 +2,7 @@ import os
 import torch
 import torch.nn as nn
 import sys
+from dataclasses import asdict
 # 导入定义的所有组件
 from src.configs.configs import config
 from src.data.data_loader import create_ner_dataloader
@@ -9,7 +10,7 @@ from src.tokenizer.vocabulary import Vocabulary
 from src.tokenizer.char_tokenizer import CharTokenizer
 from src.models.ner_model import BiGRUNerNetWork
 from src.trainer.trainer import Trainer
-from src.utils.file_io import load_json
+from src.utils.file_io import load_json, save_json
 from src.metrics.entity_metrics import calculate_entity_level_metrics
 
 def main():
@@ -84,6 +85,11 @@ def main():
         output_dir=config.output_dir,
         device=config.device
     )
+
+    # 在训练开始前，保存配置文件
+    os.makedirs(config.output_dir, exist_ok=True)
+    save_json(asdict(config), os.path.join(config.output_dir, "config.json"))
+    print(f"Configuration saved to {os.path.join(config.output_dir, 'config.json')}")
 
     trainer.fit(epochs=config.epochs)
 
