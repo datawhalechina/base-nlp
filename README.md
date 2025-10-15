@@ -81,6 +81,8 @@
     - [ ] [RLHF 技术详解](./docs/chapter11/01_rlhf.md)
     - [ ] [基于 Llama Factory 的微调实战](./docs/chapter11/02_llama_factory.md)
 - **第3章：大模型训练与量化**
+    - [ ] [Deepspeed 框架介绍](./docs/chapter11/01_deepspeed.md)
+    - [ ] [AWQ 模型量化实战](./docs/chapter11/02_awg.md)
 
 ### 第四部分：应用部署篇
 
