@@ -9,6 +9,7 @@ from src.data.data_loader import create_ner_dataloader
 from src.tokenizer.vocabulary import Vocabulary
 from src.tokenizer.char_tokenizer import CharTokenizer
 from src.models.ner_model import BiGRUNerNetWork
+from src.loss.ner_loss import NerLoss
 from src.trainer.trainer import Trainer
 from src.utils.file_io import load_json, save_json
 from src.metrics.entity_metrics import calculate_entity_level_metrics
@@ -54,7 +55,16 @@ def main():
         num_gru_layers=config.num_gru_layers
     )
     optimizer = torch.optim.AdamW(model.parameters(), lr=config.learning_rate)
-    loss_fn = nn.CrossEntropyLoss(ignore_index=-100)
+    
+    # 根据配置选择损失函数
+    if config.loss_type == "cross_entropy":
+        loss_fn = nn.CrossEntropyLoss(ignore_index=-100)
+    else:
+        loss_fn = NerLoss(
+            loss_type=config.loss_type,
+            entity_weight=config.entity_loss_weight,
+            hard_negative_ratio=config.hard_negative_ratio
+        )
 
     # --- 4. 定义评估函数 ---
     def eval_metric_fn(all_logits, all_labels, all_attention_mask):

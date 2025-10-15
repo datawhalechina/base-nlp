@@ -17,6 +17,11 @@ class NerConfig:
     learning_rate: float = 1e-3
     device: str = field(default_factory=lambda: 'cuda' if torch.cuda.is_available() else 'cpu')
     
+    # --- 损失函数参数 ---
+    loss_type: str = "cross_entropy"  # 可选: "cross_entropy", "weighted_ce", "hard_negative_mining"
+    entity_loss_weight: float = 10.0 # 在 weighted_ce 和 hard_negative_mining 中, 给实体部分损失的权重
+    hard_negative_ratio: float = 0.5 # 在 hard_negative_mining 中, 负样本数量与正样本数量的比例
+
     # --- 模型参数 ---
     hidden_size: int = 256
     num_gru_layers: int = 2

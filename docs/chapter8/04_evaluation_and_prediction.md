@@ -316,14 +316,289 @@ Entities: [
 
 在当前使用的 CMeEE 数据集中，数据不均衡是一个显著的特点：大部分 Token 都是非实体的 'O' 标签。虽然导致模型性能不佳的原因可能多种多样，但这种数据不均衡无疑是影响模型学习效果的关键因素之一。仅仅依赖实体级评估指标是在“下游”进行补救，我们也可以尝试从“上游”——即损失函数的设计入手，主动引导模型去关注实体样本。
 
-标准的交叉熵损失函数对所有 Token 一视同仁，当 `'O'` 标签占据绝大多数时，损失值自然会被这些“多数派”主导。下面介绍两种自定义损失函数策略，来尝试缓解这个问题。
+标准的交叉熵损失函数对所有 Token 一视同仁，当 `'O'` 标签占据绝大多数时，损失值自然会被这些“多数派”主导。下面介绍两种策略，来尝试缓解这个问题。
 
-### 5.1 加权交叉熵损失 (Weighted Cross-Entropy)
+### 4.1 核心策略
 
-最直观的方法就是“加权”。我们给数量稀少的实体标签（B, M, E, S）一个更高的权重，给数量庞大的非实体标签（O）一个较低的权重。例如，我们可以设置实体损失的权重为 10，非实体损失的权重为 1。这样，模型在反向传播时，如果弄错了一个实体 Token，会受到比弄错一个非实体 Token 大 10 倍的“惩罚”，从而迫使模型更加关注对实体的识别。
+#### 4.1.1 加权交叉熵损失
 
-### 5.2 硬负样本挖掘 (Hard Negative Mining)
+最简单的方法就是“加权”。给数量稀少的实体标签（B, M, E, S）一个更高的权重，给数量庞大的非实体标签（O）一个较低的权重。例如，我们可以设置实体损失的权重为 10，非实体损失的权重为 1。这样，模型在反向传播时，如果弄错了一个实体 Token，会受到比弄错一个非实体 Token 大 10 倍的“惩罚”，从而迫使模型更加关注对实体的识别。
 
-另一种思路是“采样”。在大量的非实体样本中，大部分是模型可以轻易正确预测的“简单样本”，它们对损失的贡献很小，反复学习意义不大。真正有价值的是那些模型容易搞错的“硬负样本”（Hard Negatives），例如一个模型倾向于预测为实体的非实体 Token。
+#### 4.1.2 硬负样本挖掘
+
+另一种思路是“采样”。在大量的非实体样本中，大部分是模型可以轻易正确预测的“简单样本”，它们对损失的贡献很小，反复学习意义不大。真正有价值的是那些模型容易搞错的“硬负样本”，例如一个模型倾向于预测为实体的非实体 Token。
 
 硬负样本挖掘的做法是：在计算非实体部分的损失时，我们不计算所有非实体 Token 的平均损失，而是只选择其中损失值最大（Top-K）的一部分进行计算和反向传播。这样就相当于从海量的“多数派”中，筛选出了最有价值的“疑难样本”进行学习，提升了训练的效率和效果。
+
+### 4.2 代码实现
+
+为了将上述策略集成到训练框架中，来创建一个新的 `NerLoss` 类，并修改项目的相关部分来调用它。
+
+#### 4.2.1 创建 `NerLoss`
+
+首先，在 `src` 目录下创建一个新的 `loss` 文件夹，并在其中新建 `ner_loss.py` 文件。
+
+```python
+# code/C8/src/loss/ner_loss.py
+
+import torch
+import torch.nn as nn
+
+class NerLoss(nn.Module):
+    """
+    自定义 NER 损失函数，集成两种策略来对抗数据不均衡问题：
+    1. 加权交叉熵
+    2. 硬负样本挖掘
+    """
+    def __init__(self, loss_type='cross_entropy', entity_weight=10.0, hard_negative_ratio=0.5, ignore_index=-100):
+        super().__init__()
+        # --- 参数定义 ---
+        self.loss_type = loss_type                # 损失类型: 'cross_entropy', 'weighted_ce', 'hard_negative_mining'
+        self.entity_weight = entity_weight        # 实体损失的权重
+        self.hard_negative_ratio = hard_negative_ratio  # 硬负样本与正样本的比例
+        
+        # 基础损失函数，设置为 'none' 模式以获取每个 token 的单独损失
+        self.base_loss_fn = nn.CrossEntropyLoss(reduction='none', ignore_index=ignore_index)
+
+    def forward(self, logits, labels):
+        """
+        根据初始化时选择的 loss_type 计算损失。
+        """
+        if self.loss_type == 'weighted_ce':
+            return self._weighted_cross_entropy(logits, labels)
+        elif self.loss_type == 'hard_negative_mining':
+            return self._hard_negative_mining(logits, labels)
+        else: 
+            # 默认使用 PyTorch 原生的交叉熵损失
+            return self.base_loss_fn(logits, labels).mean()
+
+    def _weighted_cross_entropy(self, logits, labels):
+        """
+        加权交叉熵损失的实现。
+        """
+        # 计算每个 token 的基础损失, shape: [batch_size, seq_len]
+        loss_per_token = self.base_loss_fn(logits, labels)
+
+        # 创建掩码来区分实体和非实体 token
+        entity_mask = (labels > 0).float()      # 实体 (B, M, E, S)
+        non_entity_mask = (labels == 0).float() # 非实体 (O)
+
+        # 分别计算实体和非实体部分的平均损失
+        entity_loss = torch.sum(loss_per_token * entity_mask) / (torch.sum(entity_mask) + 1e-8)
+        non_entity_loss = torch.sum(loss_per_token * non_entity_mask) / (torch.sum(non_entity_mask) + 1e-8)
+
+        # 根据预设权重，组合两部分损失
+        total_loss = self.entity_weight * entity_loss + 1.0 * non_entity_loss
+        return total_loss, entity_loss.detach(), non_entity_loss.detach()
+
+    def _hard_negative_mining(self, logits, labels):
+        """
+        硬负样本挖掘损失的实现。
+        """
+        # 计算每个 token 的基础损失
+        loss_per_token = self.base_loss_fn(logits, labels)
+
+        # 实体部分的损失计算与加权交叉熵方法相同
+        entity_mask = (labels > 0).float()
+        entity_loss = torch.sum(loss_per_token * entity_mask) / (torch.sum(entity_mask) + 1e-8)
+
+        # 筛选出所有非实体 token 的损失
+        non_entity_mask = (labels == 0).float()
+        non_entity_loss = loss_per_token * non_entity_mask
+
+        # 确定要挖掘的硬负样本数量
+        num_entities = torch.sum(entity_mask).item()
+        num_hard_negatives = int(num_entities * self.hard_negative_ratio)
+
+        # 如果当前批次没有实体，则按固定比例选择负样本，避免数量为0
+        if num_hard_negatives == 0:
+            num_non_entities = torch.sum(non_entity_mask).item()
+            num_hard_negatives = int(num_non_entities * 0.1)
+
+        # 从非实体损失中选出最大的 top-k 个作为硬负样本
+        topk_losses, _ = torch.topk(non_entity_loss.view(-1), k=num_hard_negatives)
+        
+        # 计算硬负样本的平均损失
+        hard_negative_loss = torch.mean(topk_losses)
+
+        # 结合实体损失和硬负样本损失
+        total_loss = self.entity_weight * entity_loss + 1.0 * hard_negative_loss
+
+        return total_loss, entity_loss.detach(), hard_negative_loss.detach()
+```
+
+这个类封装了所有与损失计算相关的逻辑。它会返回一个元组 `(总损失, 实体损失, 非实体损失)`，便于我们在训练日志中观察不同部分损失的变化情况。
+
+#### 4.2.2 更新配置文件
+
+接着，需要在 `src/configs/configs.py` 中添加几个参数，以便能够灵活地选择和配置损失函数。
+
+```python
+# code/C8/src/configs/configs.py
+
+# ...
+    learning_rate: float = 1e-3
+    device: str = field(default_factory=lambda: 'cuda' if torch.cuda.is_available() else 'cpu')
+    
+    # --- 损失函数参数 ---
+    loss_type: str = "weighted_ce"  # 可选: "cross_entropy", "weighted_ce", "hard_negative_mining"
+    entity_loss_weight: float = 10.0 # 在 weighted_ce 和 hard_negative_mining 中, 给实体部分损失的权重
+    hard_negative_ratio: float = 0.5 # 在 hard_negative_mining 中, 负样本数量与正样本数量的比例
+
+    # --- 模型参数 ---
+# ...
+```
+
+#### 4.2.3 修改训练器
+
+为了处理 `NerLoss` 返回的多个损失值，并优化训练日志，需要对 `src/trainer/trainer.py` 进行升级。
+
+主要的修改点包括：
+- 仅用“主损”反向传播（若为元组损失，取 `loss[0]`）。
+- 训练阶段累计并返回三元组（总损/实体/非实体）。
+- 评估阶段用“主损”统计验证集 `loss`。
+- 保存最优模型以 `{'model_state_dict': ...}` 方式，便于 `06_predict.py` 直接加载。
+
+```python
+# code/C8/src/trainer/trainer.py
+
+# ... (省略未修改部分)
+from tqdm import tqdm
+import os
+import torch
+
+class Trainer:
+    # ... (省略 __init__ 等)
+
+    def fit(self, epochs):
+        os.makedirs(self.output_dir, exist_ok=True)
+        best_metric = float('-inf')  # 优先最大化 F1
+        for epoch in range(1, epochs + 1):
+            print(f"--- Epoch {epoch}/{epochs} ---")
+            train_losses = self._train_one_epoch()
+            # 支持元组损失的日志打印（总损/实体/非实体）
+            if isinstance(train_losses, tuple):
+                train_loss_str = (
+                    f"Train Total Loss: {train_losses[0]:.4f}, "
+                    f"NER Loss: {train_losses[1]:.4f}, "
+                    f"Non-NER Loss: {train_losses[2]:.4f}"
+                )
+            else:
+                train_loss_str = f"Train Total Loss: {train_losses:.4f}"
+            print(train_loss_str)
+
+            eval_metrics = self._evaluate()
+            eval_metrics_str = ", ".join([f"{k}: {v:.4f}" for k, v in eval_metrics.items()])
+            print(f"Validation Metrics: {eval_metrics_str}")
+
+            # 以验证集 F1 作为保存准则；无 F1 时回退用 loss
+            is_best = False
+            if 'f1' in eval_metrics:
+                if eval_metrics['f1'] > best_metric:
+                    best_metric = eval_metrics['f1']
+                    is_best = True
+            else:
+                if best_metric == float('-inf'):
+                    best_metric = float('inf')
+                if eval_metrics['loss'] < best_metric:
+                    best_metric = eval_metrics['loss']
+                    is_best = True
+
+            if is_best:
+                print(f"New best model found! Saving to {self.output_dir}")
+                # 以字典方式保存，键为 'model_state_dict'，便于 06_predict.py 加载
+                torch.save({'model_state_dict': self.model.state_dict()},
+                           os.path.join(self.output_dir, "best_model.pth"))
+
+    def _train_one_epoch(self):
+        self.model.train()
+        total_loss_sum = 0
+        total_ner_loss = 0
+        total_non_ner_loss = 0
+        custom_loss_used = False
+
+        for batch in tqdm(self.train_loader, desc=f"Training Epoch"):
+            outputs = self._train_step(batch)
+            loss = outputs['loss']
+            if isinstance(loss, tuple):
+                # 支持元组损失（总损/实体/非实体）并分别累计
+                custom_loss_used = True
+                total_loss_sum += loss[0].item()
+                total_ner_loss += loss[1].item()
+                total_non_ner_loss += loss[2].item()
+            else:
+                total_loss_sum += loss.item()
+
+        if custom_loss_used:
+            # 返回三元组 (avg_total, avg_ner, avg_non_ner)
+            avg_loss = total_loss_sum / len(self.train_loader)
+            avg_ner_loss = total_ner_loss / len(self.train_loader)
+            avg_non_ner_loss = total_non_ner_loss / len(self.train_loader)
+            return avg_loss, avg_ner_loss, avg_non_ner_loss
+        else:
+            return total_loss_sum / len(self.train_loader)
+
+    def _train_step(self, batch):
+        # ... (省略前向部分)
+        logits = self.model(token_ids=batch['token_ids'], attention_mask=batch['attention_mask'])
+        loss = self.loss_fn(logits.permute(0, 2, 1), batch['label_ids'])
+        # 仅用主损进行反向传播（元组时取 loss[0]）
+        main_loss = loss[0] if isinstance(loss, tuple) else loss
+        self.optimizer.zero_grad()
+        main_loss.backward()
+        self.optimizer.step()
+        return {'loss': loss, 'logits': logits}
+
+    def _evaluate(self):
+        if self.dev_loader is None:
+            return None
+        self.model.eval()
+        total_loss = 0
+        all_logits, all_labels, all_attention_mask = [], [], []
+        with torch.no_grad():
+            for batch in tqdm(self.dev_loader, desc="Evaluating"):
+                outputs = self._evaluation_step(batch)
+                loss = outputs['loss']
+                # 验证 loss 也使用主损统计
+                main_loss = loss[0] if isinstance(loss, tuple) else loss
+                total_loss += main_loss.item()
+                all_logits.append(outputs['logits'].cpu())
+                all_labels.append(batch['label_ids'].cpu())
+                all_attention_mask.append(batch['attention_mask'].cpu())
+        metrics = {}
+        if self.eval_metric_fn:
+            metrics = self.eval_metric_fn(all_logits, all_labels, all_attention_mask)
+        metrics['loss'] = total_loss / len(self.dev_loader)
+        return metrics
+
+    # ... (其余方法保持不变)
+```
+
+#### 4.2.4 集成到主函数
+
+最后一步，在 `05_train.py` 中根据配置来实例化对应的损失函数。
+
+```python
+# code/C8/05_train.py
+
+# ...
+from src.loss.ner_loss import NerLoss # 导入新模块
+
+# ... (在main函数中)
+    # --- 3. 初始化模型、优化器、损失函数 ---
+    model = BiGRUNerNetWork(...)
+    optimizer = torch.optim.AdamW(...)
+    
+    # 根据配置选择损失函数
+    if config.loss_type == "cross_entropy":
+        loss_fn = nn.CrossEntropyLoss(ignore_index=-100)
+    else:
+        loss_fn = NerLoss(
+            loss_type=config.loss_type,
+            entity_weight=config.entity_loss_weight,
+            hard_negative_ratio=config.hard_negative_ratio
+        )
+# ...
+```
+
+完成以上步骤后，就可以通过简单地修改 `configs.py` 中的 `loss_type` 参数，来切换不同的损失函数策略，并观察它们对模型训练效果的影响。例如，将 `loss_type` 设置为 `"weighted_ce"`，然后重新运行 `05_train.py`，会看到训练日志中包含了实体和非实体各自的损失值。
