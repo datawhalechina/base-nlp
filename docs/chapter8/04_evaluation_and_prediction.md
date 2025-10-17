@@ -1,10 +1,10 @@
-# 第四节 模型推理
+# 第四节 模型的推理与优化
 
-经过前面章节的数据处理、模型构建与训练，我们已经得到了一个可用的 NER 模型。本节将探讨如何实现最后的模型推理的过程。接下来我们从理解模型的原始输出开始，探讨其局限性，然后详细拆解如何将这些输出解码为有意义的、结构化的实体信息，并最终将所有逻辑封装成一个简洁、可复用的 `NerPredictor` 类。
+经过前面章节的数据处理、模型构建与训练，我们已经得到了一个可用的 NER 模型。本章将探讨如何实现模型的推理过程，并深入研究如何通过自定义损失函数来应对数据不均衡问题，通过集成可视化日志、提前停止和断点续训等功能，进一步提升训练框架的健壮性和实用性。
 
-## 一、理解模型输出的挑战
+## 一、理解模型输出
 
-在上一节构建 `Trainer` 时，已经明确了实体级别的 F1 值是衡量模型性能的核心标准，而非简单的 Token 分类准确率。这里探讨一下 **为什么** 需要这样做，以及这对我们设计推理流程有何启发。
+在上一节构建 `Trainer` 时，已经明确了实体级别的 F1 值是衡量模型性能的核心标准，而非简单的 Token 分类准确率。这里探讨一下 **为什么** 需要这样做，以及这对设计推理流程有何启发。
 
 ### 1.1 Token 级准确率的陷阱
 
@@ -20,9 +20,9 @@
 
 ## 二、从标签到实体：解码预测序列
 
-模型的前向传播最终输出的是一个 `logits` 张量，形状为 `[batch_size, seq_len, num_tags]`。经过 `argmax` 操作后，我们会得到一个标签 ID 序列，例如 `[0, 9, 10, 11, 0, ...]`。
+模型的前向传播最终输出的是一个 `logits` 张量，形状为 `[batch_size, seq_len, num_tags]`。经过 `argmax` 操作后，会得到一个标签 ID 序列，例如 `[0, 9, 10, 11, 0, ...]`。
 
-这个序列本身并不直观。为了进行实体级评估，或者将预测结果呈现给用户，我们必须实现一个 **解码 (Decode)** 函数，将这个数字序列转换成一个包含具体实体信息的列表，例如：`[{"text": "高血压", "type": "dis", "start": 3, "end": 6}]`。这个解码过程的核心，就是根据 `BMES` 标注体系的规则，从标签序列中解析出实体的边界和类型。
+这个序列本身并不直观。为了进行实体级评估，或者将预测结果呈现给用户，必须实现一个 **解码 (Decode)** 函数，将这个数字序列转换成一个包含具体实体信息的列表，例如：`[{"text": "高血压", "type": "dis", "start": 3, "end": 6}]`。这个解码过程的核心，就是根据 `BMES` 标注体系的规则，从标签序列中解析出实体的边界和类型。
 
 ### 2.1 解码逻辑详解
 
@@ -61,7 +61,7 @@
 
 ### 2.2 代码实现
 
-我们将这个解码逻辑在 `06_predict.py` 中实现为一个名为 `_extract_entities` 的方法。它接收分词后的 `tokens` 列表和模型预测的 `tags` 列表作为输入，输出结构化的实体字典列表。
+这个解码逻辑在 `06_predict.py` 中实现为一个名为 `_extract_entities` 的方法。它接收分词后的 `tokens` 列表和模型预测的 `tags` 列表作为输入，输出结构化的实体字典列表。
 
 ```python
 # code/C8/06_predict.py
@@ -328,7 +328,7 @@ Entities: [
 
 另一种思路是“采样”。在大量的非实体样本中，大部分是模型可以轻易正确预测的“简单样本”，它们对损失的贡献很小，反复学习意义不大。真正有价值的是那些模型容易搞错的“硬负样本”，例如一个模型倾向于预测为实体的非实体 Token。
 
-硬负样本挖掘的做法是：在计算非实体部分的损失时，我们不计算所有非实体 Token 的平均损失，而是只选择其中损失值最大（Top-K）的一部分进行计算和反向传播。这样就相当于从海量的“多数派”中，筛选出了最有价值的“疑难样本”进行学习，提升了训练的效率和效果。
+硬负样本挖掘的做法是：在计算非实体部分的损失时，不计算所有非实体 Token 的平均损失，而是只选择其中损失值最大（Top-K）的一部分进行计算和反向传播。这样就相当于从海量的“多数派”中，筛选出了最有价值的“疑难样本”进行学习，提升了训练的效率和效果。
 
 ### 4.2 代码实现
 
@@ -429,7 +429,43 @@ class NerLoss(nn.Module):
 
 这个类封装了所有与损失计算相关的逻辑。它会返回一个元组 `(总损失, 实体损失, 非实体损失)`，便于我们在训练日志中观察不同部分损失的变化情况。
 
-#### 4.2.2 更新配置文件
+#### 4.2.2 硬负样本挖掘实现细节
+
+在 `_hard_negative_mining` 的实现中，有一个需要特别注意的细节：`torch.topk` 函数要求 `k` 的值不能超过输入张量的维度大小。在此场景中，如果计算出的 `num_hard_negatives` 超过了当前批次中非实体 `O` 的总数，就会引发运行时错误。
+
+同时，需要将二维的 `non_entity_loss` 展平（`view(-1)`）成一维，以确保 `topk` 是在所有非实体样本中寻找损失最大的 `k` 个。下面是修正后的关键代码片段：
+
+```python
+# code/C8/src/loss/ner_loss.py
+
+def _hard_negative_mining(self, logits, labels):
+    # ... (省略实体损失计算)
+
+    non_entity_mask = (labels == 0).float()
+    non_entity_loss = loss_per_token * non_entity_mask
+    
+    num_hard_negatives = int(torch.sum(entity_mask).item() * self.hard_negative_ratio)
+    if num_hard_negatives == 0:
+         num_hard_negatives = int(torch.sum(non_entity_mask).item() * 0.1)
+
+    # 关键修改：将损失展平为一维
+    non_entity_loss_flat = non_entity_loss.view(-1)
+    
+    # 关键修改：确保 k 不超过非实体 token 的总数
+    num_non_entities = torch.sum(non_entity_mask).item()
+    k = min(num_hard_negatives, num_non_entities)
+    
+    if k == 0: # 如果没有负样本可选，则损失为 0
+        non_ner_loss_mean = torch.tensor(0.0, device=logits.device)
+    else:
+        topk_losses, _ = torch.topk(non_entity_loss_flat, k=k)
+        non_ner_loss_mean = torch.mean(topk_losses)
+
+    total_loss = self.entity_weight * ner_loss_mean + 1.0 * non_ner_loss_mean
+    return total_loss, ner_loss_mean.detach(), non_ner_loss_mean.detach()
+```
+
+#### 4.2.3 更新配置文件
 
 接着，需要在 `src/configs/configs.py` 中添加几个参数，以便能够灵活地选择和配置损失函数。
 
@@ -449,7 +485,7 @@ class NerLoss(nn.Module):
 # ...
 ```
 
-#### 4.2.3 修改训练器
+#### 4.2.4 修改训练器
 
 为了处理 `NerLoss` 返回的多个损失值，并优化训练日志，需要对 `src/trainer/trainer.py` 进行升级。
 
@@ -574,7 +610,7 @@ class Trainer:
     # ... (其余方法保持不变)
 ```
 
-#### 4.2.4 集成到主函数
+#### 4.2.5 集成到主函数
 
 最后一步，在 `05_train.py` 中根据配置来实例化对应的损失函数。
 
@@ -602,3 +638,296 @@ from src.loss.ner_loss import NerLoss # 导入新模块
 ```
 
 完成以上步骤后，就可以通过简单地修改 `configs.py` 中的 `loss_type` 参数，来切换不同的损失函数策略，并观察它们对模型训练效果的影响。例如，将 `loss_type` 设置为 `"weighted_ce"`，然后重新运行 `05_train.py`，会看到训练日志中包含了实体和非实体各自的损失值。
+
+#### 4.2.6 解读验证集损失
+
+在使用自定义损失函数（尤其是 `weighted_ce` 和 `hard_negative_mining`）时，你可能会观察到一个现象：**验证集上的 F1 分数在稳步提升，但 `loss` 值却停滞不前甚至上升**。这是一个正常且符合预期的现象。
+
+这是因为 `Trainer` 在评估阶段同样使用了这个自定义的、加权的损失函数来计算验证集 `loss`。这个 `loss` 主要反映的是**训练目标**的优化情况，而不是一个标准的评估指标。
+
+-   **权重影响**: 由于实体部分的损失被赋予了很高的权重（例如 `entity_loss_weight=10.0`），少数几个实体相关的错误就会导致 `loss` 值大幅波动或居高不下。
+-   **硬负样本挖掘影响**: `hard_negative_mining` 策略会动态地聚焦于模型最容易搞错的那些非实体 `O` 标签。随着训练的进行，简单的负样本损失会降低，但模型会转而面对更“棘手”的硬样本，导致计算出的 `non_ner_loss` 可能不会持续下降。
+
+因此，当使用这些高级损失策略时，**验证集 `loss` 不再是衡量模型好坏的主要标准**。应将注意力更多地放在能够直接反映任务最终目标的指标上，对于 NER 任务而言，这个指标就是**实体级别的 F1 分数**。这也是 `Trainer` 将 F1 作为保存最佳模型依据的原因。
+
+## 五、优化训练工作流
+
+在我们实现了核心的训练、评估与推理流程之后，一个健robustness的训练框架还需要更多辅助功能来应对真实场景中的各种挑战。本节将介绍如何为 Trainer 集成三项关键的实用功能：**可视化日志**、**提前停止**和**断点续训**，让训练过程更加可控、高效和可靠。
+
+### 5.1 训练过程可视化
+
+纯文本的训练日志虽然直接，但难以洞察模型训练的全局动态。为了更直观地监控训练过程，例如观察损失是否平稳下降、验证集 F1 是否持续提升，以及模型是否出现过拟合迹象，可以集成 TensorBoard 来实现可视化。
+
+为了将日志记录功能模块化，可以创建一个专门的 `TensorBoardLogger` 类来封装所有与 `SummaryWriter` 相关的操作。
+
+1.  **创建 `TensorBoardLogger` 类**:
+
+    在 `src/utils/` 目录下创建 `logger.py` 文件。这个类将负责 `SummaryWriter` 的初始化、指标记录和关闭。
+
+    ```python
+    # code/C8/src/utils/logger.py
+    from torch.utils.tensorboard import SummaryWriter
+
+    class TensorBoardLogger:
+        def __init__(self, log_dir):
+            # 如果提供了日志目录，则初始化 SummaryWriter
+            self.writer = SummaryWriter(log_dir) if log_dir else None
+
+        def log_metrics(self, metrics, step, prefix):
+            # 如果 writer 未初始化，则不执行任何操作
+            if self.writer is None: return
+            
+            # 根据 metrics 类型（元组或字典）以不同方式记录
+            if isinstance(metrics, tuple):
+                self.writer.add_scalar(f"{prefix}/Total_Loss", metrics[0], step)
+                if len(metrics) > 1:
+                    self.writer.add_scalar(f"{prefix}/NER_Loss", metrics[1], step)
+                    self.writer.add_scalar(f"{prefix}/Non-NER_Loss", metrics[2], step)
+            elif isinstance(metrics, dict):
+                for k, v in metrics.items():
+                    self.writer.add_scalar(f"{prefix}/{k.capitalize()}", v, step)
+        
+        def close(self):
+            # 确保在训练结束时关闭 writer，将所有挂起的事件写入磁盘
+            if self.writer:
+                self.writer.close()
+    ```
+
+2.  **在 `configs.py` 中添加配置**:
+
+    ```python
+    # code/C8/src/configs/configs.py
+    
+    # ... (省略)
+    class NerConfig:
+        # ... (省略)
+        # --- 增强功能参数 ---
+        output_summary_dir: str = "output/logs" # TensorBoard 日志输出路径
+    # ... (省略)
+    ```
+
+3.  **在 `Trainer` 中使用 `TensorBoardLogger`**:
+
+    ```python
+    # code/C8/src/trainer/trainer.py
+    from src.utils.logger import TensorBoardLogger
+
+    class Trainer:
+        def __init__(self, ..., summary_writer_dir=None, ...):
+            # ... (省略其他初始化)
+            # 初始化日志记录器
+            self.logger = TensorBoardLogger(summary_writer_dir)
+            
+        def fit(self, epochs):
+            for epoch in range(self.start_epoch, epochs + 1):
+                # ... (训练与评估)
+                
+                # 在每个 epoch 结束后调用 logger 记录训练和验证指标
+                self.logger.log_metrics(train_losses, epoch, "Train")
+                self.logger.log_metrics(eval_metrics, epoch, "Validation")
+            
+            # 训练结束后关闭 logger
+            self.logger.close()
+    ```
+
+### 5.2 早停实现
+
+为了让这个逻辑更清晰且可复用，可将其封装到一个独立的 `EarlyStopping` 类中，这个类就像一个“回调”一样，在每个 epoch 结束时被 `Trainer` 调用来检查是否需要停止。
+
+1.  **创建 `EarlyStopping` 工具类**:
+
+    在 `src/utils/` 目录下创建一个新文件 `early_stop.py`。
+
+    ```python
+    # code/C8/src/utils/early_stop.py
+    import numpy as np
+
+    class EarlyStopping:
+        def __init__(self, patience=5, verbose=False, delta=0, monitor='f1', mode='max'):
+            self.patience = patience          # 耐心值：连续多少轮性能没有提升则停止
+            self.verbose = verbose            # 是否打印日志
+            self.counter = 0                  # 计数器
+            self.best_score = None            # 历史最佳分数
+            self.early_stop = False           # 提前停止标志
+            self.val_metric_best = np.inf if mode == 'min' else -np.inf # 根据模式初始化最佳指标
+            self.delta = delta                # 容忍的性能下降范围
+            self.monitor = monitor            # 监控的指标
+            self.mode = mode                  # 'max' 或 'min'
+
+        def __call__(self, val_metric):
+            # 根据 'mode' 调整分数计算方式
+            score = -val_metric if self.mode == 'min' else val_metric
+
+            if self.best_score is None:
+                self.best_score = score
+            # 如果当前分数没有超过（最佳分数 + delta），则增加计数器
+            elif score < self.best_score + self.delta:
+                self.counter += 1
+                if self.verbose:
+                    print(f'EarlyStopping counter: {self.counter} out of {self.patience}')
+                if self.counter >= self.patience:
+                    self.early_stop = True
+            # 如果分数有提升，则更新最佳分数并重置计数器
+            else:
+                self.best_score = score
+                self.counter = 0
+            return self.early_stop
+    ```
+
+2.  **在 `configs.py` 中添加配置**:
+
+    ```python
+    # code/C8/src/configs/configs.py
+    
+    # ... (省略)
+    early_stopping_patience: int = 5 # 提前停止的耐心轮数
+    ```
+
+3.  **在 `Trainer` 中集成 `EarlyStopping` 实例**:
+
+    ```python
+    # code/C8/src/trainer/trainer.py
+    from src.utils.early_stop import EarlyStopping
+
+    class Trainer:
+        def __init__(self, ..., early_stopping_patience=5, ...):
+            # ... (省略其他初始化)
+            # 初始化 EarlyStopping 回调
+            self.early_stopping = EarlyStopping(
+                patience=early_stopping_patience,
+                verbose=True,
+                monitor='f1'
+            )
+
+        def fit(self, epochs):
+            for epoch in range(self.start_epoch, epochs + 1):
+                # ... (训练与评估)
+
+                current_metric = eval_metrics.get('f1', -eval_metrics.get('loss', float('inf')))
+                
+                # ... (保存最佳模型逻辑)
+
+                # 调用 early_stopping 实例判断是否需要停止
+                if self.early_stopping(current_metric):
+                    print("Early stopping triggered.")
+                    break # 跳出训练循环
+    ```
+### 5.3 实现断点续训
+
+对于需要数小时甚至数天的长时间训练任务，意外中断（如断电、程序崩溃）是常见风险。从头开始训练会造成巨大的时间浪费。**断点续训 (Checkpointing & Resuming)** 机制允许我们保存训练过程中的完整状态（包括模型权重、优化器状态和当前轮数），并在需要时从中恢复，继续训练。
+
+实现此功能主要分为三步：首先添加配置项，然后在 `Trainer` 中构建核心的保存与恢复逻辑，最后在主训练脚本中启用它。
+
+1.  **在 `configs.py` 中添加配置**:
+
+    首先，在 `NerConfig` 中增加一个 `resume_checkpoint` 字段，用于指定需要恢复的检查点文件路径。如果它为 `None`，则从头开始训练。
+
+    ```python
+    # code/C8/src/configs/configs.py
+    # ... (其他配置)
+    # 用于恢复训练的检查点路径, e.g., "output/last_model.pth"
+    resume_checkpoint: str = None 
+    ```
+
+2.  **为 `Trainer` 新增保存与恢复能力**:
+
+    接下来，为 `Trainer` 类赋予保存和恢复检查点的能力。这包括新增两个核心方法 `_save_checkpoint` 和 `_resume_checkpoint`，并修改 `__init__` 和 `fit` 方法来调用它们。
+
+    ```python
+    # code/C8/src/trainer/trainer.py
+
+    class Trainer:
+        def __init__(self, ..., resume_checkpoint=None, ...):
+            # ...
+            self.start_epoch = 1 # 默认从第一轮开始
+            # ...
+            # 如果指定了检查点路径，则调用恢复方法
+            if resume_checkpoint:
+                self._resume_checkpoint(resume_checkpoint)
+
+        def fit(self, epochs):
+            # 使用 self.start_epoch 替换固定的 `1`，以支持从指定轮数开始
+            for epoch in range(self.start_epoch, epochs + 1):
+                # ... (训练和评估)
+
+                # --- 保存逻辑 ---
+                is_best = False
+                current_metric = eval_metrics.get('f1', -eval_metrics.get('loss', float('inf')))
+                if current_metric > self.best_metric:
+                    self.best_metric = current_metric
+                    is_best = True
+                
+                # 在每轮结束后都保存检查点
+                self._save_checkpoint(epoch, is_best)
+
+                # ... (早停逻辑)
+
+                # 调用 early_stopping 实例判断是否需要停止
+                if self.early_stopping(current_metric):
+                    print("Early stopping triggered.")
+                    break # 跳出训练循环
+    ```
+    这里有几个关键点：
+    - `__init__` 中会检查 `resume_checkpoint`，如果提供了路径，就调用恢复方法。
+    - `fit` 方法的循环 `for epoch in range(1, epochs + 1)` 需要修改为 `for epoch in range(self.start_epoch, epochs + 1)`，以便从恢复的轮数继续训练。
+    - `fit` 方法在每轮结束时调用 `_save_checkpoint` 来保存当前状态。
+
+3.  **在 `05_train.py` 中启用并校验**:
+
+    最后，在主训练脚本中，我们需要在初始化 `Trainer` 之前，先检查配置文件中 `resume_checkpoint` 指定的路径是否有效。如果路径无效，就将其置为 `None`，以确保 `Trainer` 能够安全地从头开始训练，而不是因找不到文件而报错。
+
+    ```python
+    # code/C8/05_train.py
+
+    # ... (省略前半部分)
+
+    # 在初始化 Trainer 前，检查检查点文件是否存在
+    if config.resume_checkpoint and not os.path.exists(config.resume_checkpoint):
+        print(f"Checkpoint file not found: {config.resume_checkpoint}. Starting training from scratch.")
+        config.resume_checkpoint = None # 设为 None, 避免 Trainer 报错
+
+    trainer = Trainer(
+        # ...
+        resume_checkpoint=config.resume_checkpoint
+    )
+    ```
+
+### 5.4 更新主训练脚本
+
+完成了对 `Trainer` 的升级并将日志、早停等功能模块化后，最后一步是在主训练脚本 `05_train.py` 中，将相应的配置参数传递给 `Trainer` 实例，从而正式启用这些新功能。
+
+```python
+# code/C8/05_train.py
+
+# ... (省略前半部分代码)
+
+# --- 5. 初始化并启动训练器 ---
+trainer = Trainer(
+    model=model,
+    optimizer=optimizer,
+    loss_fn=loss_fn,
+    train_loader=train_loader,
+    dev_loader=dev_loader,
+    eval_metric_fn=eval_metric_fn,
+    output_dir=config.output_dir,
+    device=config.device,
+    # 传入新增的配置参数，以启用对应的功能
+    summary_writer_dir=config.output_summary_dir,      # TensorBoard 日志目录
+    early_stopping_patience=config.early_stopping_patience, # 早停耐心轮数
+    resume_checkpoint=config.resume_checkpoint        # 断点续训的检查点路径
+)
+
+# ... (省略后半部分代码)
+```
+
+## 六、小结
+
+回顾整个流程，一个完整的命名实体识别（NER）项目已经从零开始被系统性地构建出来。整个过程贯穿了从数据处理、模型构建到训练优化与最终推理的全流程：
+
+*   **数据处理与准备 (第二节)**：首先解析了原始的 CMeEE 数据集，构建了全局统一的 `BMES` 标签映射 (`categories.json`) 和字符级词汇表 (`vocabulary.json`)，并最终封装成一个高效、可复用的 `DataLoader`，为模型训练提供了标准化的数据输入。
+
+*   **模型构建与训练框架 (第三节)**：接着，设计并实现了一个基于 `Bi-GRU` 的序列标注模型，并围绕它打造了一个结构清晰、组件化的训练框架。通过将模型、数据加载器、分词器、评估指标等核心功能解耦，构建了一个易于维护和扩展的 `Trainer` 类。
+
+*   **推理与工作流优化 (第四节)**：最后，实现了从模型输出到结构化实体的解码逻辑，并将其封装成一个开箱即用的 `NerPredictor` 推理器。同时，为了提升训练框架的健壮性和实用性，还集成了自定义损失函数来应对数据不均衡问题，并引入了 TensorBoard 可视化日志、提前停止（Early Stopping）和断点续训（Checkpointing）等高级功能。
+
+通过以上步骤，不仅实现了一个能跑通的 NER 模型，更重要的是搭建起了一套模块化、功能完备的 NER 项目脚手架。尽管当前基线模型的性能可能还有提升空间，但这个框架为后续探索更先进的模型（如 BERT）、尝试更复杂的策略提供了不错的起点。

@@ -11,56 +11,53 @@ def _trans_entity2tuple(label_ids, id2tag):
         tag = id2tag.get(label_id.item(), 'O')
 
         if tag.startswith('B-'):
-            if current_entity:
-                entities.append(current_entity)
-            entity_type = tag[2:]
-            current_entity = (entity_type, i, i + 1)
+            # 遇到新的 B- 不自动闭合旧片段，直接开启新片段
+            current_entity = (tag[2:], i, i + 1)
         elif tag.startswith('M-'):
             if current_entity and current_entity[0] == tag[2:]:
                 current_entity = (current_entity[0], current_entity[1], i + 1)
             else:
+                # 非法 M-，丢弃当前片段
                 current_entity = None
         elif tag.startswith('E-'):
             if current_entity and current_entity[0] == tag[2:]:
                 current_entity = (current_entity[0], current_entity[1], i + 1)
                 entities.append(current_entity)
+            # 无论是否匹配，E- 处都结束当前片段
             current_entity = None
         elif tag.startswith('S-'):
-            if current_entity:
-                entities.append(current_entity)
-            entity_type = tag[2:]
-            entities.append((entity_type, i, i + 1))
+            # 单字实体直接落盘
+            entities.append((tag[2:], i, i + 1))
             current_entity = None
-        else: # 'O' tag
-            if current_entity:
-                entities.append(current_entity)
+        else:  # 'O'
+            # O 不闭合未完成片段，直接丢弃
             current_entity = None
-            
-    if current_entity:
-        entities.append(current_entity)
         
     return set(entities)
 
 def calculate_entity_level_metrics(all_pred_ids, all_label_ids, all_masks, id2tag):
     """
-    计算实体级别的精确率、召回率和 F1 分数。
+    计算实体级别的精确率、召回率和 F1 分数（逐样本 + 严格解码）。
     """
-    # 过滤掉填充部分
-    active_preds = [p[m] for p, m in zip(all_pred_ids, all_masks)]
-    active_labels = [l[m] for l, m in zip(all_label_ids, all_masks)]
-
     true_entities = set()
     pred_entities = set()
 
-    for i in range(len(active_labels)):
-        # 为每个样本添加唯一标识符，以区分不同样本中的相同实体
-        # (样本ID, 实体类型, 起始位置, 结束位置)
-        sample_true_entities = {(i,) + entity for entity in _trans_entity2tuple(active_labels[i], id2tag)}
-        sample_pred_entities = {(i,) + entity for entity in _trans_entity2tuple(active_preds[i], id2tag)}
-        
-        true_entities.update(sample_true_entities)
-        pred_entities.update(sample_pred_entities)
-        
+    sample_idx = 0
+    # 逐 batch，逐样本地应用 mask 后再解码，避免跨样本串扰
+    for preds_batch, labels_batch, masks_batch in zip(all_pred_ids, all_label_ids, all_masks):
+        B = labels_batch.shape[0]
+        for b in range(B):
+            row_mask = masks_batch[b].bool()
+            row_labels = labels_batch[b][row_mask]
+            row_preds = preds_batch[b][row_mask]
+
+            te = _trans_entity2tuple(row_labels, id2tag)
+            pe = _trans_entity2tuple(row_preds, id2tag)
+
+            true_entities.update({(sample_idx,) + e for e in te})
+            pred_entities.update({(sample_idx,) + e for e in pe})
+            sample_idx += 1
+
     num_correct = len(true_entities.intersection(pred_entities))
     num_true = len(true_entities)
     num_pred = len(pred_entities)

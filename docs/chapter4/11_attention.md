@@ -407,7 +407,7 @@ class Seq2Seq(nn.Module):
 
 ### 6.2 Global Attention vs. Local Attention
 
-这是另一组从计算范围角度区分的概念，出自于另一篇开創性的论文[^4]。
+这是另一组从计算范围角度区分的概念，出自于另一篇开创性的论文[^4]。
 
 -   **Global Attention (全局注意力)**：其思想与 Soft Attention 基本一致，即在计算注意力时，会考虑编码器的**所有**隐藏状态。
 

@@ -2,9 +2,15 @@ import torch
 from tqdm import tqdm
 import os
 
+from src.utils.early_stop import EarlyStopping
+from src.utils.logger import TensorBoardLogger
+
+
 class Trainer:
     def __init__(self, model, optimizer, loss_fn, train_loader, dev_loader=None, 
-                 eval_metric_fn=None, output_dir=None, device='cpu'):
+                 eval_metric_fn=None, output_dir=None, device='cpu', 
+                 summary_writer_dir=None, early_stopping_patience=5,
+                 resume_checkpoint=None):
         self.model = model.to(device)
         self.optimizer = optimizer
         self.loss_fn = loss_fn
@@ -13,55 +19,82 @@ class Trainer:
         self.eval_metric_fn = eval_metric_fn
         self.output_dir = output_dir
         self.device = device
-        print(f"Trainer will run on device: {self.device}")
         
+        self.start_epoch = 1
+        self.best_metric = float('-inf')
+
         if self.output_dir:
             os.makedirs(self.output_dir, exist_ok=True)
+            
+        self.logger = TensorBoardLogger(summary_writer_dir)
+            
+        self.early_stopping = EarlyStopping(
+            patience=early_stopping_patience,
+            verbose=True,
+            monitor='f1'
+        )
+            
+        if resume_checkpoint:
+            self._resume_checkpoint(resume_checkpoint)
+
+        print(f"Trainer will run on device: {self.device}")
+
+    def _resume_checkpoint(self, path):
+        """恢复训练状态"""
+        print(f"Loading checkpoint from: {path}")
+        checkpoint = torch.load(path, map_location=self.device)
+        self.model.load_state_dict(checkpoint['model_state_dict'])
+        self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        self.start_epoch = checkpoint['epoch'] + 1
+        self.best_metric = checkpoint['best_metric']
+        print(f"Resumed from checkpoint. Starting at epoch {self.start_epoch}.")
 
     def fit(self, epochs):
-        os.makedirs(self.output_dir, exist_ok=True)
-        
-        # 默认最大化主要评估指标（如 F1 分数）
-        best_metric = float('-inf')
-        
-        for epoch in range(1, epochs + 1):
+        for epoch in range(self.start_epoch, epochs + 1):
             print(f"--- Epoch {epoch}/{epochs} ---")
             
+            # --- 训练 ---
             train_losses = self._train_one_epoch()
+            self._on_epoch_end_log(train_losses, epoch, "Train")
 
-            # 根据返回值的类型来格式化训练损失日志
-            if isinstance(train_losses, tuple):
-                train_loss_str = f"Train Total Loss: {train_losses[0]:.4f}, NER Loss: {train_losses[1]:.4f}, Non-NER Loss: {train_losses[2]:.4f}"
-            else:
-                train_loss_str = f"Train Total Loss: {train_losses:.4f}"
-            print(train_loss_str)
-
+            # --- 评估 ---
             eval_metrics = self._evaluate()
-            
-            # 将评估指标格式化为字符串打印
-            eval_metrics_str = ", ".join([f"{k}: {v:.4f}" for k, v in eval_metrics.items()])
-            print(f"Validation Metrics: {eval_metrics_str}")
-            
-            # 判断是否需要保存模型
-            is_best = False
-            # 保存最佳模型优先依据 F1 分数
-            if 'f1' in eval_metrics:
-                if eval_metrics['f1'] > best_metric:
-                    best_metric = eval_metrics['f1']
-                    is_best = True
-            # 若无 F1 指标，则回退为最小化验证集损失
-            else:
-                # 首次进入该分支时，best_metric 为 -inf，需要重置为 +inf 以便进行最小化比较
-                if best_metric == float('-inf'):
-                    best_metric = float('inf')
-                
-                if eval_metrics['loss'] < best_metric:
-                    best_metric = eval_metrics['loss']
-                    is_best = True
+            self._on_epoch_end_log(eval_metrics, epoch, "Validation")
 
-            if is_best:
+            # --- 保存与提前停止 ---
+            is_best = False
+            current_metric = eval_metrics.get('f1', -eval_metrics.get('loss', float('inf')))
+            if current_metric > self.best_metric:
+                self.best_metric = current_metric
+                is_best = True
                 print(f"New best model found! Saving to {self.output_dir}")
-                torch.save({'model_state_dict': self.model.state_dict()}, os.path.join(self.output_dir, "best_model.pth"))
+                self._save_checkpoint(epoch, is_best=True)
+            
+            self._save_checkpoint(epoch, is_best=False) # 保存 latest
+            
+            if self.early_stopping(current_metric):
+                print("Early stopping triggered.")
+                break
+        
+        self.logger.close()
+
+    def _on_epoch_end_log(self, metrics, epoch, prefix):
+        """在 epoch 结束时打印并记录日志"""
+        # 打印到控制台
+        if prefix == 'Train':
+            log_str = self._format_loss_log(metrics)
+        else: # Validation
+            log_str = ", ".join([f"{k}: {v:.4f}" for k, v in metrics.items()])
+        print(f"{prefix} Metrics: {log_str}")
+        
+        # 记录到 TensorBoard
+        self.logger.log_metrics(metrics, epoch, prefix)
+
+    def _format_loss_log(self, losses):
+        if isinstance(losses, tuple):
+            return f"Total Loss: {losses[0]:.4f}, NER Loss: {losses[1]:.4f}, Non-NER Loss: {losses[2]:.4f}"
+        else:
+            return f"Total Loss: {losses:.4f}"
 
     def _train_one_epoch(self):
         self.model.train()
@@ -109,20 +142,23 @@ class Trainer:
             return None
 
         self.model.eval()
-        total_loss = 0
-        all_logits = []
-        all_labels = []
-        all_attention_mask = []
+        total_loss_sum, total_ner_loss, total_non_ner_loss = 0, 0, 0
+        custom_loss_used = False
+        all_logits, all_labels, all_attention_mask = [], [], []
 
         with torch.no_grad():
             for batch in tqdm(self.dev_loader, desc="Evaluating"):
                 outputs = self._evaluation_step(batch)
-
                 loss = outputs['loss']
-                # 若损失为元组，取第一个元素作为主损进行统计
-                main_loss = loss[0] if isinstance(loss, tuple) else loss
-                total_loss += main_loss.item()
 
+                if isinstance(loss, tuple):
+                    custom_loss_used = True
+                    total_loss_sum += loss[0].item()
+                    total_ner_loss += loss[1].item()
+                    total_non_ner_loss += loss[2].item()
+                else:
+                    total_loss_sum += loss.item()
+                
                 all_logits.append(outputs['logits'].cpu())
                 all_labels.append(batch['label_ids'].cpu())
                 all_attention_mask.append(batch['attention_mask'].cpu())
@@ -131,7 +167,12 @@ class Trainer:
         if self.eval_metric_fn:
             metrics = self.eval_metric_fn(all_logits, all_labels, all_attention_mask)
         
-        metrics['loss'] = total_loss / len(self.dev_loader)
+        # 将各部分损失也加入到 metrics 中
+        metrics['loss'] = total_loss_sum / len(self.dev_loader)
+        if custom_loss_used:
+            metrics['ner_loss'] = total_ner_loss / len(self.dev_loader)
+            metrics['non_ner_loss'] = total_non_ner_loss / len(self.dev_loader)
+            
         return metrics
 
     def _evaluation_step(self, batch):
@@ -140,8 +181,15 @@ class Trainer:
         loss = self.loss_fn(logits.permute(0, 2, 1), batch['label_ids'])
         return {'loss': loss, 'logits': logits}
 
-    def _save_checkpoint(self, is_best):
-        state = {'model_state_dict': self.model.state_dict()}
+    def _save_checkpoint(self, epoch, is_best):
+        """保存检查点"""
+        state = {
+            'epoch': epoch,
+            'model_state_dict': self.model.state_dict(),
+            'optimizer_state_dict': self.optimizer.state_dict(),
+            'best_metric': self.best_metric
+        }
         if is_best:
             torch.save(state, os.path.join(self.output_dir, 'best_model.pth'))
+        
         torch.save(state, os.path.join(self.output_dir, 'last_model.pth'))

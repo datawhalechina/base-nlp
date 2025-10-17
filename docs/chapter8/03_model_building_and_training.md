@@ -872,69 +872,66 @@ import torch
 
 def _trans_entity2tuple(label_ids, id2tag):
     """
-    将标签ID序列转换为实体元组列表。
-    一个实体元组示例: ('PER', 0, 2) -> (实体类型, 起始位置, 结束位置)
+    将标签ID序列转换为实体元组列表（严格 BMES 解码）。
+    仅在遇到 E- 或 S- 时落盘；遇到新的 B- 或 O 不闭合未完成片段。
     """
     entities = []
     current_entity = None
 
     for i, label_id in enumerate(label_ids):
+        # 将标签ID映射为字符串标签，未知则视作 'O'
         tag = id2tag.get(label_id.item(), 'O')
 
         if tag.startswith('B-'):
-            # 如果遇到 B- 标签，说明一个新实体的开始
-            if current_entity:
-                entities.append(current_entity) # 先将上一个实体存起来
-            entity_type = tag[2:]
-            current_entity = (entity_type, i, i + 1)
+            # 开启新片段：记录类型与起始位置；end 暂定为 i+1
+            current_entity = (tag[2:], i, i + 1)
         elif tag.startswith('M-'):
-            # 如果遇到 M- 标签，说明当前实体在继续
+            # 仅当已存在片段，且类型一致时续接（扩展 end）
             if current_entity and current_entity[0] == tag[2:]:
                 current_entity = (current_entity[0], current_entity[1], i + 1)
             else:
-                # 理论上 M- 标签前必须是 B- 或 M- 同类型标签，否则是标注错误
+                # 类型不一致或不存在片段：丢弃未完成片段
                 current_entity = None
         elif tag.startswith('E-'):
-            # 如果遇到 E- 标签，说明实体结束
+            # 仅当已存在片段且类型一致时闭合并落盘
             if current_entity and current_entity[0] == tag[2:]:
                 current_entity = (current_entity[0], current_entity[1], i + 1)
                 entities.append(current_entity)
+            # 无论是否匹配，E- 都视为一次片段结束
             current_entity = None
         elif tag.startswith('S-'):
-            # 如果遇到 S- 标签，说明是一个单字实体
-            if current_entity:
-                entities.append(current_entity)
-            entity_type = tag[2:]
-            entities.append((entity_type, i, i + 1))
+            # 单字实体：直接落盘（start=i, end=i+1）
+            entities.append((tag[2:], i, i + 1))
             current_entity = None
-        else: # O 标签
-            # 如果遇到 O 标签，说明当前没有实体，或者实体已结束
-            if current_entity:
-                entities.append(current_entity)
+        else:  # 'O'
+            # 非实体位置：严格模式不闭合未完成片段，直接丢弃
             current_entity = None
-            
-    # 防止最后一个实体没有被正确添加
-    if current_entity:
-        entities.append(current_entity)
-        
+
+    # 返回集合去重
     return set(entities)
 
 def calculate_entity_level_metrics(all_pred_ids, all_label_ids, id2tag):
+    """
+    逐样本评估（未使用 mask），解码采用严格 BMES。
+    """
     true_entities = set()
     pred_entities = set()
 
     # 遍历批次中的每一个样本
     for i in range(len(all_label_ids)):
+        # 将标签ID序列解码为实体集合（严格 BMES）
         sample_true_entities = _trans_entity2tuple(all_label_ids[i], id2tag)
         sample_pred_entities = _trans_entity2tuple(all_pred_ids[i], id2tag)
         
         true_entities.update(sample_true_entities)
         pred_entities.update(sample_pred_entities)
         
-    num_correct = len(true_entities.intersection(pred_entities))
-    num_true = len(true_entities)
-    num_pred = len(pred_entities)
+    # 计算 TP / FP / FN
+    num_correct = len(true_entities.intersection(pred_entities))  # TP
+    num_true = len(true_entities)   # TP + FN
+    num_pred = len(pred_entities)   # TP + FP
 
+    # 计算 P / R / F1（含零保护）
     precision = num_correct / num_pred if num_pred > 0 else 0.0
     recall = num_correct / num_true if num_true > 0 else 0.0
     f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0.0
@@ -961,43 +958,41 @@ def calculate_entity_level_metrics(all_pred_ids, all_label_ids, all_masks, id2ta
     """
     计算实体级别的精确率、召回率和 F1 分数。
     """
-    # 过滤掉填充部分，只保留有效标签进行计算
-    active_preds = [p[m] for p, m in zip(all_pred_ids, all_masks)]
-    active_labels = [l[m] for l, m in zip(all_label_ids, all_masks)]
-
     true_entities = set()
     pred_entities = set()
+    sample_idx = 0
 
-    for i in range(len(active_labels)):
-        # 为每个样本的实体添加一个唯一的样本 ID，以区分不同样本中的相同实体
-        # 最终元组格式: (样本ID, 实体类型, 起始位置, 结束位置)
-        sample_true_entities = {(i,) + entity for entity in _trans_entity2tuple(active_labels[i], id2tag)}
-        sample_pred_entities = {(i,) + entity for entity in _trans_entity2tuple(active_preds[i], id2tag)}
-        
-        true_entities.update(sample_true_entities)
-        pred_entities.update(sample_pred_entities)
-        
-    # 计算 TP, FP, FN
-    num_correct = len(true_entities.intersection(pred_entities)) # 预测正确且真实存在的 (TP)
-    num_true = len(true_entities)    # 所有真实存在的 (TP + FN)
-    num_pred = len(pred_entities)    # 所有预测出的 (TP + FP)
+    # 按批次遍历，同时保持 preds/labels/masks 对齐
+    for preds_batch, labels_batch, masks_batch in zip(all_pred_ids, all_label_ids, all_masks):
+        B = labels_batch.shape[0]  # 当前批次样本数
+        for b in range(B):
+            # 对单个样本应用布尔掩码，去除 padding 位置
+            row_mask = masks_batch[b].bool()
+            row_labels = labels_batch[b][row_mask]
+            row_preds = preds_batch[b][row_mask]
 
-    # 计算 P, R, F1
+            # 严格 BMES 解码为实体集合
+            te = _trans_entity2tuple(row_labels, id2tag)
+            pe = _trans_entity2tuple(row_preds, id2tag)
+
+            # 为每个实体附加 (sample_idx,) 前缀，确保不同样本的相同实体不冲突
+            true_entities.update({(sample_idx,) + e for e in te})
+            pred_entities.update({(sample_idx,) + e for e in pe})
+            sample_idx += 1
+
+    num_correct = len(true_entities.intersection(pred_entities))
+    num_true = len(true_entities)
+    num_pred = len(pred_entities)
+
     precision = num_correct / num_pred if num_pred > 0 else 0.0
     recall = num_correct / num_true if num_true > 0 else 0.0
     f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0.0
-
-    return {
-        "precision": precision,
-        "recall": recall,
-        "f1": f1
-    }
+    return {"precision": precision, "recall": recall, "f1": f1}
 ```
-
 
 ### 3.8 组装所有组件
 
-最后让我们组装刚才实现的各个组件。在根目录创建一个 `05_train.py` 文件，它将导入并组装我们在 `src/` 目录下构建的所有模块。
+最后让我们组装刚才实现的各个组件。在根目录创建一个 `05_train.py` 文件，它将导入并组装在 `src/` 目录下构建的所有模块。
 
 ```python
 # 05_train.py
@@ -1099,3 +1094,5 @@ if __name__ == "__main__":
 ```
 
 最终，我们完整地构建了从数据处理、模型构建、训练封装到评估的整个 NER 项目流程。在 `code/C8/` 目录下，通过 `python 05_train.py` 命令，就可以启动整个训练过程。
+
+```

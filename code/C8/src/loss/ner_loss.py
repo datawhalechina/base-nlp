@@ -81,9 +81,15 @@ class NerLoss(nn.Module):
 
         # 选出损失最大的 k 个非实体 token
         non_entity_loss_flat = non_entity_loss.view(-1)
-        topk_losses, _ = torch.topk(non_entity_loss_flat, k=num_hard_negatives)
+        # 注意：确保 k 不超过非实体 token 的总数
+        num_non_entities = torch.sum(non_entity_mask).item()
+        k = min(num_hard_negatives, num_non_entities)
         
-        non_ner_loss_mean = torch.mean(topk_losses)
+        if k == 0: # 如果没有负样本可选，则损失为0
+            non_ner_loss_mean = torch.tensor(0.0, device=logits.device)
+        else:
+            topk_losses, _ = torch.topk(non_entity_loss_flat, k=k)
+            non_ner_loss_mean = torch.mean(topk_losses)
 
         # 加权求和
         total_loss = self.entity_weight * ner_loss_mean + 1.0 * non_ner_loss_mean

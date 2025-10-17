@@ -85,6 +85,11 @@ def main():
         return metrics
 
     # --- 5. 初始化并启动训练器 ---
+    # 在初始化 Trainer 前，检查检查点文件是否存在
+    if config.resume_checkpoint and not os.path.exists(config.resume_checkpoint):
+        print(f"Checkpoint file not found: {config.resume_checkpoint}. Starting training from scratch.")
+        config.resume_checkpoint = None # 设为 None, 避免 Trainer 报错
+
     trainer = Trainer(
         model=model,
         optimizer=optimizer,
@@ -93,7 +98,11 @@ def main():
         dev_loader=dev_loader,
         eval_metric_fn=eval_metric_fn,
         output_dir=config.output_dir,
-        device=config.device
+        device=config.device,
+        # 新增参数
+        summary_writer_dir=config.output_summary_dir,
+        early_stopping_patience=config.early_stopping_patience,
+        resume_checkpoint=config.resume_checkpoint
     )
 
     # 在训练开始前，保存配置文件
