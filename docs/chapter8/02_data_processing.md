@@ -2,7 +2,7 @@
 
 在上一节，我们简单了解了命名实体识别的任务定义、应用场景及主流实现方法。本节将正式进入编码阶段，从数据处理开始，逐步构建一个完整的 NER 项目。为了清晰地构建 NER 的处理流程，我们采用流程化的代码组织思路，将整个流程拆分为多个独立的脚本。
 
-> [本节完整代码](https://github.com/datawhalechina/base-nlp/tree/main/code/C8)
+> [本章全部代码](https://github.com/datawhalechina/base-nlp/tree/main/code/C8)
 
 ## 一、数据处理流程总览
 
