@@ -72,6 +72,7 @@
     - [x] [命名实体识别概要](./docs/chapter8/01_named_entity_recognition.md)
     - [x] [NER 项目的数据处理](./docs/chapter8/02_data_processing.md)
     - [x] [模型构建、训练与推理](./docs/chapter8/03_model_building_and_training.md)
+    - [x] [模型的推理与优化](./docs/chapter8/04_evaluation_and_prediction.md)
 
 ### 第三部分：微调量化篇
 - **第1章：参数高效微调**

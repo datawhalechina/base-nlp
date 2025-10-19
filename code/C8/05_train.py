@@ -14,10 +14,20 @@ from src.trainer.trainer import Trainer
 from src.utils.file_io import load_json, save_json
 from src.metrics.entity_metrics import calculate_entity_level_metrics
 
+def seed_everything(seed: int = 42):
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
 def main():
     """
     主函数，负责组装所有组件并启动NER训练任务。
     """
+    # --- 0. 设置随机数种子---
+    seed_everything(getattr(config, 'seed', 42))
+
     # --- 1. 加载词汇表和标签映射, 并创建分词器 ---
     vocab_path = os.path.join(config.data_dir, config.vocab_file)
     tags_path = os.path.join(config.data_dir, config.tags_file)
@@ -76,12 +86,23 @@ def main():
         
         active_masks = [mask.bool() for mask in all_attention_mask_cpu]
 
+        # 计算基于 mask 的 token 级准确率
+        total_equal_tokens = 0
+        total_effective_tokens = 0
+        for preds, labels, mask in zip(all_preds_ids_cpu, all_labels_cpu, active_masks):
+            # preds/labels/mask: [B, T]
+            equal = (preds == labels) & mask
+            total_equal_tokens += int(equal.sum().item())
+            total_effective_tokens += int(mask.sum().item())
+        token_acc = (total_equal_tokens / total_effective_tokens) if total_effective_tokens > 0 else 0.0
+
         metrics = calculate_entity_level_metrics(
             all_preds_ids_cpu, 
             all_labels_cpu, 
             active_masks, 
             id2tag
         )
+        metrics['token_acc'] = token_acc
         return metrics
 
     # --- 5. 初始化并启动训练器 ---

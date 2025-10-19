@@ -62,18 +62,18 @@
 -   **`text`**：原始文本字符串
 -   **`entities`**：实体标注列表，每个实体包含：
     -   `start_idx`：实体起始位置（**包含**）
-    -   `end_idx`：实体结束位置（**不包含**）
+    -   `end_idx`：实体结束位置（**包含**）
     -   `type`：实体类型（如 `dis` 疾病、`dru` 药物）
     -   `entity`：实体文本（用于验证）
 
 > **索引的包含性**
 >
-> 通过实际测试可以验证：`start_idx` **包含** 在实体范围内，`end_idx` **不包含**。这与 Python 的切片操作 `text[start:end]` 行为一致。例如：
+> 对于当前 `data/` 目录下的数据，经实测：`start_idx` 与 `end_idx` 均为**包含**（闭区间）。实体应由 `text[start_idx : end_idx + 1]` 取得。例如：
 > - 文本："（2）室上性心动过速可用常规抗心律失常药物控制，年龄小于5岁。"
-> - 实体 "室上性心动过速"：`start_idx=3, end_idx=10`
-> - 实际字符：`text[3:10]` = "室上性心动过速"（索引3到9）
+> - 实体 "室上性心动过速"：`start_idx=3, end_idx=9`
+> - 实际字符：`text[3:10]` = "室上性心动过速"
 >
-> 所以，实体长度 = `end_idx - start_idx`
+> 所以，实体长度 = `end_idx - start_idx + 1`。
 
 ## 二、构建标签映射
 
@@ -449,7 +449,7 @@ class NerDataset(Dataset):
         for entity in record.get('entities', []):
             entity_type = entity['type']
             start = entity['start_idx']
-            end = entity['end_idx'] - 1  # 转换为闭区间索引
+            end = entity['end_idx']  # 闭区间结束索引
 
             if end >= len(tokens): continue
 

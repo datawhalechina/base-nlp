@@ -632,7 +632,7 @@ class NerDataset(Dataset):
         for entity in record.get('entities', []):
             entity_type = entity['type']
             start = entity['start_idx']
-            end = entity['end_idx'] - 1
+            end = entity['end_idx']  # 闭区间结束索引
 
             if end >= len(tokens): continue
 
@@ -1065,13 +1065,22 @@ def main():
         # 将 attention_mask 转换为布尔类型，用于过滤 padding
         active_masks = [mask.bool() for mask in all_attention_mask_cpu]
 
-        # 调用之前定义的评估函数
+        # 基于 mask 的 token 级准确率
+        total_equal_tokens, total_effective_tokens = 0, 0
+        for preds, labels, mask in zip(all_preds_ids_cpu, all_labels_cpu, active_masks):
+            eq = (preds == labels) & mask
+            total_equal_tokens += int(eq.sum().item())
+            total_effective_tokens += int(mask.sum().item())
+        token_acc = (total_equal_tokens / total_effective_tokens) if total_effective_tokens > 0 else 0.0
+
+        # 调用之前定义的实体级评估函数
         metrics = calculate_entity_level_metrics(
             all_preds_ids_cpu, 
             all_labels_cpu, 
             active_masks, 
             id2tag
         )
+        metrics['token_acc'] = token_acc
         return metrics
 
     # --- 5. 初始化并启动训练器 ---

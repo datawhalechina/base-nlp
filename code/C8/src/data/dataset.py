@@ -25,7 +25,7 @@ class NerDataset(Dataset):
         for entity in record.get('entities', []):
             entity_type = entity['type']
             start = entity['start_idx']
-            end = entity['end_idx'] - 1
+            end = entity['end_idx']
 
             if end >= len(tokens): continue
 

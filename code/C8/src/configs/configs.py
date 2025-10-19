@@ -14,11 +14,12 @@ class NerConfig:
     # --- 训练参数 ---
     batch_size: int = 32
     epochs: int = 20
-    learning_rate: float = 2e-5
+    learning_rate: float = 3e-4
     device: str = field(default_factory=lambda: 'cuda' if torch.cuda.is_available() else 'cpu')
     
     # --- 增强功能参数 ---
     output_summary_dir: str = "output/logs" # TensorBoard 日志输出路径
+    seed: int = 42  # 随机数种子（用于可复现性）
     early_stopping_patience: int = 5 # 提前停止的耐心轮数
     resume_checkpoint: str = None # 用于恢复训练的检查点路径, e.g., "output/last_model.pth"
     
@@ -30,8 +31,6 @@ class NerConfig:
     # --- 模型参数 ---
     hidden_size: int = 256
     num_gru_layers: int = 2
-    use_bert: bool = True
-    bert_model_name_or_path: str = "bert-base-chinese"
 
 # 实例化配置
 config = NerConfig()

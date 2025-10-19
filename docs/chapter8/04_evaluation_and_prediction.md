@@ -656,7 +656,7 @@ from src.loss.ner_loss import NerLoss # 导入新模块
 
 ### 5.1 训练过程可视化
 
-纯文本的训练日志虽然直接，但难以洞察模型训练的全局动态。为了更直观地监控训练过程，例如观察损失是否平稳下降、验证集 F1 是否持续提升，以及模型是否出现过拟合迹象，可以集成 TensorBoard 来实现可视化。
+纯文本的训练日志虽然直接，但难以洞察模型训练的全局动态。为了更直观地监控训练过程，例如观察损失是否平稳下降、验证集 F1 是否持续提升，以及模型是否出现过拟合迹象，可以集成 TensorBoard 来实现可视化；同时，为提高结果的可复现性，建议在训练开始前固定随机数种子。
 
 为了将日志记录功能模块化，可以创建一个专门的 `TensorBoardLogger` 类来封装所有与 `SummaryWriter` 相关的操作。
 
@@ -703,6 +703,7 @@ from src.loss.ner_loss import NerLoss # 导入新模块
         # ... (省略)
         # --- 增强功能参数 ---
         output_summary_dir: str = "output/logs" # TensorBoard 日志输出路径
+        seed: int = 42  # 随机数种子（用于可复现性）
     # ... (省略)
     ```
 
@@ -728,6 +729,29 @@ from src.loss.ner_loss import NerLoss # 导入新模块
             
             # 训练结束后关闭 logger
             self.logger.close()
+    ```
+
+4.  **添加随机数种子**
+
+    为了使可视化对比与调参更稳定可复现，建议在训练启动时固定随机数种子，读取 `configs.py` 中新增的 `seed` 配置。
+
+    在 `05_train.py` 中添加工具函数并调用：
+
+    ```python
+    # code/C8/05_train.py
+    # ... 省略导入
+    
+    def seed_everything(seed: int = 42):
+        torch.manual_seed(seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+    
+    def main():
+        # 训练前设置随机种子（读取 configs.py 的 seed）
+        seed_everything(getattr(config, 'seed', 42))
+        # ... 后续组件初始化与训练
     ```
 
 ### 5.2 早停实现
