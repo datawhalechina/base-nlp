@@ -58,7 +58,7 @@ class NerDataset(Dataset):
         for entity in record.get('entities', []):
             entity_type = entity['type']
             start = entity['start_idx']
-            end = entity['end_idx'] - 1  # 转换为包含模式
+            end = entity['end_idx']
 
             if end >= len(tokens): continue
 
