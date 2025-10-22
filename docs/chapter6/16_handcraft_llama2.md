@@ -1,20 +1,29 @@
-# 第一节 手搓一个 Llama2
+# 第一节 手搓一个大模型
 
-本章将聚焦于 Llama2，一个由 Meta AI 推出的开源大模型。我们将不再依赖 `transformers` 库的高度封装，而是从零开始，先梳理关键思想与设计取舍，再逐步落地到代码实现与最小可验证原型。换言之，本章将坚持“从思路到代码”的路径，而非“基于现有代码讲解”。这一过程将帮助你聚焦原理与架构决策，深化对大模型内部工作的理解。
+前面我们已经深入学习了 **注意力机制**、**Transformer 架构**，以及基于其 Encoder 衍生的 **BERT** 和基于 Decoder 衍生的 **GPT**。接下来尝试亲手实现一个前沿（曾经的前沿）大语言模型，看看它是否真的难以理解。
 
-在此之前，我们已经深入探讨了 **注意力机制**、**Transformer 架构**，以及基于其 Encoder 衍生的 **BERT** 和基于 Decoder 衍生的 **GPT**。理论知识已经为我们铺平了道路，现在，是时候亲手实现一个真正的前沿大语言模型了。
+本节将聚焦于 Llama2，一个由 Meta AI 推出的开源大模型。我们不再依赖 `transformers` 库的高度封装，而是从零开始，先梳理关键思想与设计取舍，再逐步落地到代码实现与最小可验证原型。这一过程将帮助你理解原理与架构决策，深化对大模型内部工作的理解。
 
 > [本节完整代码](https://github.com/datawhalechina/base-nlp/tree/main/code/C6/llama2)
 
 ## 一、Llama2 架构总览
 
-Llama2 遵循了 GPT 系列开创的 **Decoder-Only** 架构。这意味着它完全由 [Transformer 解码器层](?path=docs/chapter4/12_transformer.md#32-解码器-decoder) 堆叠而成，天然适用于自回归的文本生成任务。
+Llama2 遵循了 GPT 系列开创的 **Decoder-Only** 架构。这意味着它完全由 **Transformer 解码器层** 堆叠而成，天然适用于自回归的文本生成任务。
 
 <p align="center">
   <img src="./images/6_1_1.svg" width="60%" alt="Llama2 架构图" />
   <br />
   <em>图 6-1：Llama2 架构示意图</em>
 </p>
+
+如图 6-1 所示，Llama2 的核心由 N 个相同的 Transformer Block 堆叠而成。每个 Block 内部的数据流展示了 Llama2 的设计：
+
+- **预归一化 (Pre-Normalization)**：与经典 Transformer 的后归一化不同，输入在进入注意力层和前馈网络**之前**，都会先经过一次 `RMS Norm`。这被认为是提升大模型训练稳定性的关键。
+- **组件升级**：注意力机制升级为 `Grouped-Query Attention (GQA)`，前馈网络升级为 `Feed-Forward Network (SwiGLU)`，归一化层也替换为计算更高效的 `RMS Norm`。
+- **旋转位置编码 (RoPE)**：图中可见，位置信息并非在输入端与词嵌入相加，而是在注意力层内部，通过 `RoPE` 操作动态地施加于查询（Q）和键（K）向量之上。
+- **残差连接**：每个子层（注意力层和前馈网络）的输出都通过残差连接（`+`号）与子层的输入相加，保留了原始信息流。
+
+整个模型的数据流自下而上贯穿所有 Transformer Block，最后经过一次最终的 `RMS Norm` 和一个线性输出层，得到 Logits。
 
 与原始 Transformer 解码器相比，Llama2 及其同类模型进行了一系列关键的现代化改造，以提升性能和训练稳定性。其数据流可以概括为：
 
