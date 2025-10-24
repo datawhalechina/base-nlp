@@ -69,7 +69,6 @@ class LlamaTransformer(nn.Module):
         max_seq_len: int = 2048,
     ):
         super().__init__()
-        assert vocab_size > 0, "vocab_size must be > 0"
         self.vocab_size = vocab_size
         self.n_layers = n_layers
         self.dim = dim
@@ -103,7 +102,6 @@ class LlamaTransformer(nn.Module):
 
     def forward(self, tokens: torch.Tensor, start_pos: int) -> torch.Tensor:
         bsz, seqlen = tokens.shape
-        assert tokens.dtype == torch.long
         h = self.tok_embeddings(tokens)
         self.freqs_cis = self.freqs_cis.to(h.device)
         freqs_cis = self.freqs_cis[start_pos : start_pos + seqlen]

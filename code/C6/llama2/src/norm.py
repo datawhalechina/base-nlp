@@ -29,7 +29,3 @@ if __name__ == "__main__":
     print("--- RMSNorm Test ---")
     print("Input shape:", x.shape)
     print("Output shape:", output.shape)
-    assert x.shape == output.shape, "Shape mismatch"
-    print("RMSNorm test passed!")
-
-

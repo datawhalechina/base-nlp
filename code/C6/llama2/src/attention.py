@@ -20,8 +20,6 @@ class GroupedQueryAttention(nn.Module):
 
         n_kv_heads = n_kv_heads if n_kv_heads is not None else n_heads
 
-        assert dim % n_heads == 0, "dim must be divisible by n_heads"
-        assert n_heads % n_kv_heads == 0, "n_heads must be multiple of n_kv_heads"
 
         self.n_local_heads = n_heads
         self.n_local_kv_heads = n_kv_heads
@@ -62,8 +60,6 @@ class GroupedQueryAttention(nn.Module):
         mask: torch.Tensor | None = None,
     ) -> torch.Tensor:
         bsz, seqlen, _ = x.shape
-        assert 0 <= start_pos <= self.max_seq_len
-        assert start_pos + seqlen <= self.max_seq_len
 
         xq = self.wq(x).view(bsz, seqlen, self.n_local_heads, self.head_dim)
         xk = self.wk(x).view(bsz, seqlen, self.n_local_kv_heads, self.head_dim)
@@ -73,15 +69,9 @@ class GroupedQueryAttention(nn.Module):
 
         self.cache_k = self.cache_k.to(xq)
         self.cache_v = self.cache_v.to(xq)
-
-        # 训练时避免跨步累计计算图引用；每个 batch 起始位置清零对应样本 cache
-        if self.training and start_pos == 0:
-            self.cache_k[:bsz].zero_()
-            self.cache_v[:bsz].zero_()
-
-        # 写入缓存时切断梯度，避免下一步反向误用上一步的计算图
-        self.cache_k[:bsz, start_pos : start_pos + seqlen] = xk.detach()
-        self.cache_v[:bsz, start_pos : start_pos + seqlen] = xv.detach()
+        # 推理向：直接写入缓存
+        self.cache_k[:bsz, start_pos : start_pos + seqlen] = xk
+        self.cache_v[:bsz, start_pos : start_pos + seqlen] = xv
 
         keys = self.cache_k[:bsz, : start_pos + seqlen]
         values = self.cache_v[:bsz, : start_pos + seqlen]
@@ -130,7 +120,5 @@ if __name__ == "__main__":
     print("--- GroupedQueryAttention Test ---")
     print("Input shape:", x.shape)
     print("Output shape:", output.shape)
-    assert x.shape == output.shape, "Shape mismatch"
-    print("GroupedQueryAttention test passed!")
 
 

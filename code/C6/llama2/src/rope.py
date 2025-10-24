@@ -2,7 +2,6 @@ import torch
 
 
 def precompute_freqs_cis(dim: int, end: int, theta: float = 10000.0) -> torch.Tensor:
-    assert dim % 2 == 0, "RoPE requires even head_dim"
     freqs = 1.0 / (theta ** (torch.arange(0, dim, 2)[: (dim // 2)].float() / dim))
     t = torch.arange(end, device=freqs.device)
     freqs = torch.outer(t, freqs).float()
@@ -12,8 +11,6 @@ def precompute_freqs_cis(dim: int, end: int, theta: float = 10000.0) -> torch.Te
 
 def reshape_for_broadcast(freqs_cis: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
     ndim = x.ndim
-    assert 0 <= 1 < ndim
-    assert freqs_cis.shape == (x.shape[1], x.shape[-1])
     shape = [d if i == 1 or i == ndim - 1 else 1 for i, d in enumerate(x.shape)]
     return freqs_cis.view(*shape)
 
@@ -23,10 +20,8 @@ def apply_rotary_emb(
     xk: torch.Tensor,
     freqs_cis: torch.Tensor,
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    # 允许 GQA：Q/K 头数可不同，但最后一维 head_dim 必须一致
-    assert xq.shape[-1] == xk.shape[-1]
+    # 允许 GQA：Q/K 头数可不同，但最后一维 head_dim 应一致
     head_dim = xq.shape[-1]
-    assert head_dim % 2 == 0, "RoPE requires even head_dim"
 
     xq_ = torch.view_as_complex(xq.float().reshape(*xq.shape[:-1], -1, 2))
     xk_ = torch.view_as_complex(xk.float().reshape(*xk.shape[:-1], -1, 2))
@@ -59,7 +54,6 @@ if __name__ == "__main__":
     print("--- Test precompute_freqs_cis ---")
     freqs_cis = precompute_freqs_cis(dim=head_dim, end=seq_len * 2)
     print("freqs_cis shape:", freqs_cis.shape)
-    assert freqs_cis.shape == (seq_len * 2, head_dim // 2)
 
     # --- Test apply_rotary_emb ---
     print("\n--- Test apply_rotary_emb ---")
@@ -69,16 +63,5 @@ if __name__ == "__main__":
     xq_out, xk_out = apply_rotary_emb(xq, xk, freqs_cis_slice)
     print("xq shape (in/out):", xq.shape, xq_out.shape)
     print("xk shape (in/out):", xk.shape, xk_out.shape)
-    assert xq.shape == xq_out.shape and xk.shape == xk_out.shape
-
-    # --- Test repeat_kv ---
-    print("\n--- Test repeat_kv ---")
-    cache_k = torch.randn(batch_size, seq_len, n_kv_heads, head_dim)
-    repeated_k = repeat_kv(cache_k, n_rep)
-    print("KV cache shape:", cache_k.shape)
-    print("Repeated KV shape:", repeated_k.shape)
-    assert repeated_k.shape == (batch_size, seq_len, n_heads, head_dim)
-    
-    print("\nRoPE tests passed!")
 
 

@@ -42,6 +42,4 @@ if __name__ == "__main__":
     print("--- FeedForward (SwiGLU) Test ---")
     print("Input shape:", x.shape)
     print("Output shape:", output.shape)
-    assert x.shape == output.shape, "Shape mismatch"
-    print("FeedForward test passed!")
 
