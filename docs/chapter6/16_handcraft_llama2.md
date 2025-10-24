@@ -11,7 +11,7 @@
 Llama2 遵循了 GPT 系列开创的 **Decoder-Only** 架构。这意味着它完全由 **Transformer 解码器层** 堆叠而成，天然适用于自回归的文本生成任务。
 
 <p align="center">
-  <img src="./images/6_1_1.svg" width="60%" alt="Llama2 架构图" />
+  <img src="./images/6_1_1.svg" width="40%" alt="Llama2 架构图" />
   <br />
   <em>图 6-1：Llama2 架构示意图</em>
 </p>
