@@ -2,7 +2,7 @@ import math
 import torch
 import torch.nn as nn
 
-from .rope import apply_rotary_emb, repeat_kv
+from .rope import apply_rotary_emb, repeat_kv, precompute_freqs_cis
 
 
 class GroupedQueryAttention(nn.Module):
@@ -101,5 +101,36 @@ class GroupedQueryAttention(nn.Module):
         out = torch.matmul(scores, values)
         out = out.transpose(1, 2).contiguous().view(bsz, seqlen, -1)
         return self.wo(out)
+
+
+if __name__ == "__main__":
+    # 准备参数和输入
+    batch_size, seq_len, dim = 4, 16, 128
+    n_heads, n_kv_heads = 8, 2
+    head_dim = dim // n_heads
+
+    # 初始化注意力模块
+    attention = GroupedQueryAttention(
+        dim=dim,
+        n_heads=n_heads,
+        n_kv_heads=n_kv_heads,
+        max_batch_size=batch_size,
+        max_seq_len=seq_len,
+    )
+
+    # 准备输入
+    x = torch.randn(batch_size, seq_len, dim)
+    freqs_cis = precompute_freqs_cis(dim=head_dim, end=seq_len * 2)
+    freqs_cis_slice = freqs_cis[:seq_len]
+
+    # 执行前向传播
+    output = attention(x, start_pos=0, freqs_cis=freqs_cis_slice)
+
+    # 验证输出形状
+    print("--- GroupedQueryAttention Test ---")
+    print("Input shape:", x.shape)
+    print("Output shape:", output.shape)
+    assert x.shape == output.shape, "Shape mismatch"
+    print("GroupedQueryAttention test passed!")
 
 

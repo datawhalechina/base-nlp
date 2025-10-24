@@ -16,3 +16,20 @@ class RMSNorm(nn.Module):
         return out * self.weight
 
 
+if __name__ == "__main__":
+    # 准备参数和输入
+    batch_size, seq_len, dim = 4, 16, 64
+    x = torch.randn(batch_size, seq_len, dim)
+
+    # 初始化并应用 RMSNorm
+    norm = RMSNorm(dim)
+    output = norm(x)
+
+    # 验证输出形状
+    print("--- RMSNorm Test ---")
+    print("Input shape:", x.shape)
+    print("Output shape:", output.shape)
+    assert x.shape == output.shape, "Shape mismatch"
+    print("RMSNorm test passed!")
+
+

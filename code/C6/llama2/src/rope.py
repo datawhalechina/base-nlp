@@ -49,3 +49,36 @@ def repeat_kv(x: torch.Tensor, n_rep: int) -> torch.Tensor:
     )
 
 
+if __name__ == "__main__":
+    # 准备参数和输入
+    batch_size, seq_len, n_heads, n_kv_heads, head_dim = 4, 16, 8, 2, 16
+    dim = n_heads * head_dim
+    n_rep = n_heads // n_kv_heads
+
+    # --- Test precompute_freqs_cis ---
+    print("--- Test precompute_freqs_cis ---")
+    freqs_cis = precompute_freqs_cis(dim=head_dim, end=seq_len * 2)
+    print("freqs_cis shape:", freqs_cis.shape)
+    assert freqs_cis.shape == (seq_len * 2, head_dim // 2)
+
+    # --- Test apply_rotary_emb ---
+    print("\n--- Test apply_rotary_emb ---")
+    xq = torch.randn(batch_size, seq_len, n_heads, head_dim)
+    xk = torch.randn(batch_size, seq_len, n_kv_heads, head_dim)
+    freqs_cis_slice = freqs_cis[:seq_len]
+    xq_out, xk_out = apply_rotary_emb(xq, xk, freqs_cis_slice)
+    print("xq shape (in/out):", xq.shape, xq_out.shape)
+    print("xk shape (in/out):", xk.shape, xk_out.shape)
+    assert xq.shape == xq_out.shape and xk.shape == xk_out.shape
+
+    # --- Test repeat_kv ---
+    print("\n--- Test repeat_kv ---")
+    cache_k = torch.randn(batch_size, seq_len, n_kv_heads, head_dim)
+    repeated_k = repeat_kv(cache_k, n_rep)
+    print("KV cache shape:", cache_k.shape)
+    print("Repeated KV shape:", repeated_k.shape)
+    assert repeated_k.shape == (batch_size, seq_len, n_heads, head_dim)
+    
+    print("\nRoPE tests passed!")
+
+

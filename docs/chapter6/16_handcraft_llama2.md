@@ -19,7 +19,7 @@ Llama2 遵循了 GPT 系列开创的 **Decoder-Only** 架构。这意味着它�
 如图 6-1 所示，Llama2 的核心由 N 个相同的 Transformer Block 堆叠而成。每个 Block 内部的数据流展示了 Llama2 的设计：
 
 - **预归一化 (Pre-Normalization)**：与经典 Transformer 的后归一化不同，输入在进入注意力层和前馈网络**之前**，都会先经过一次 `RMS Norm`。这被认为是提升大模型训练稳定性的关键。
-- **组件升级**：注意力机制升级为 `Grouped-Query Attention (GQA)`，前馈网络升级为 `Feed-Forward Network (SwiGLU)`，归一化层也替换为计算更高效的 `RMS Norm`。
+- **组件升级**：支持 `Grouped-Query Attention (GQA)`（如 Llama2-70B 采用[^1]；小模型可视为 `n_kv_heads == n_heads` 的 MHA 特例），前馈网络采用 `SwiGLU`，归一化使用 `RMSNorm`。
 - **旋转位置编码 (RoPE)**：图中可见，位置信息并非在输入端与词嵌入相加，而是在注意力层内部，通过 `RoPE` 操作动态地施加于查询（Q）和键（K）向量之上。
 - **残差连接**：每个子层（注意力层和前馈网络）的输出都通过残差连接（`+`号）与子层的输入相加，保留了原始信息流。
 
@@ -42,7 +42,7 @@ Llama2 遵循了 GPT 系列开创的 **Decoder-Only** 架构。这意味着它�
 
 #### 2.1.1 设计思路
 
-标准的 Layer Normalization 在 Transformer 中用于稳定训练，但它的计算（减去均值、除以标准差）相对复杂。为了在保证性能的同时提升计算效率，Llama2 采用了它的变体 **RMSNorm (Root Mean Square Layer Normalization)**[^1]。
+标准的 Layer Normalization 在 Transformer 中用于稳定训练，但它的计算（减去均值、除以标准差）相对复杂。为了在保证性能的同时提升计算效率，Llama2 采用了它的变体 **RMSNorm (Root Mean Square Layer Normalization)**[^2]。
 
 其目的是 **简化归一化过程**：
 - **移除均值中心化**：只通过输入的均方根 (Root Mean Square) 对它进行缩放。
@@ -83,13 +83,36 @@ class RMSNorm(nn.Module):
 -   `_norm` 方法精确地实现了 RMSNorm 的核心公式。
 -   `self.eps` 是一个为了防止除以零而添加的小常数，保证了数值稳定性。
 
+#### 2.1.4 单元测试
+
+为了确保每个模块的独立可用性和正确性，我们为其添加一个 `if __name__ == "__main__"` 测试块。这是一种良好的工程实践，允许我们单独运行此文件来快速验证 `RMSNorm` 的功能。
+
+```python
+# code/C6/llama2/src/norm.py
+if __name__ == "__main__":
+    # 准备参数和输入
+    batch_size, seq_len, dim = 4, 16, 64
+    x = torch.randn(batch_size, seq_len, dim)
+
+    # 初始化并应用 RMSNorm
+    norm = RMSNorm(dim)
+    output = norm(x)
+
+    # 验证输出形状
+    print("--- RMSNorm Test ---")
+    print("Input shape:", x.shape)
+    print("Output shape:", output.shape)
+    assert x.shape == output.shape, "Shape mismatch"
+    print("RMSNorm test passed!")
+```
+
 ### 2.2 旋转位置编码
 
 #### 2.2.1 设计思路
 
 我们在 Transformer 章节中已经知道，模型需要位置信息来理解词元的顺序。传统的位置编码（无论是固定的还是可学习的）是一种绝对位置编码，它为每个位置分配一个独立的向量。
 
-Llama2 则采用了更先进的 **旋转位置编码 (Rotary Positional Embedding, RoPE)**[^2]，它是一种**相对位置编码**。与传统位置编码通过**加法**直接注入词嵌入的方式不同，RoPE 的策略是：**位置信息不再是“加”到词嵌入上，而是在计算注意力时，通过复数“乘法”的方式“旋转”Query 和 Key 向量**。
+Llama2 则采用了更先进的 **旋转位置编码 (Rotary Positional Embedding, RoPE)**[^3]，它是一种**相对位置编码**。与传统位置编码通过**加法**直接注入词嵌入的方式不同，RoPE 的策略是：**位置信息不再是“加”到词嵌入上，而是在计算注意力时，通过复数“乘法”的方式“旋转”Query 和 Key 向量**。
 
 这样做的好处是：
 - **相对位置感知**：两个词元（位置为 $m$ 和 $n$）旋转后的Q/K向量点积，仅与它们的相对距离 $m-n$ 相关，而与绝对位置无关。这使得模型学到的注意力模式具备平移不变性，例如，模型处理相距2个词元的关系时，无论它们出现在序列的哪个位置，其计算方式都是一致的。
@@ -116,13 +139,13 @@ RoPE 的实现分为两部分：
         -   `freqs_cis`: 预计算的旋转矩阵切片。
     -   **输出**: 旋转后的 `xq` 和 `xk`，形状不变。
 
-> 我们知道，进入注意力模块的张量 `x` 的形状是 `[batch_size, seq_len, dim]`。为了实现多头注意力，首先要将这个张量通过一个线性层（例如 `wq`），它将输入从 `dim` 维投影到 `n_heads * head_dim` 维。在 Llama2 的设计中，输入维度 `dim` 恰好等于 `n_heads * head_dim`，因此这个线性层实际上是一个 `dim` 到 `dim` 的投影，其输出张量形状依然是 `[batch_size, seq_len, dim]`。关键的一步发生在之后：我们利用 `dim = n_heads * head_dim` 这一关系，通过一次 `view` 或 `reshape` 操作，将最后一个维度 `dim` 逻辑上拆分为 `n_heads` 和 `head_dim` 两个维度，从而得到 `[batch_size, seq_len, n_heads, head_dim]` 这样的四维张量。这个形状的含义是：对于每个词元，我们都计算出了 `n_heads` 个独立的、维度为 `head_dim` 的 Query 向量表示。对 Key 向量 `xk` 的处理也是完全类似的。
+> 我们知道，进入注意力模块的张量 `x` 的形状是 `[batch_size, seq_len, dim]`。为了实现多头注意力，首先要将这个张量通过一个线性层（例如 `wq`），它将输入从 `dim` 维投影到 `n_heads * head_dim` 维。在 Llama2 的设计中，输入维度 `dim` 恰好等于 `n_heads * head_dim`，所以这个线性层实际上是一个 `dim` 到 `dim` 的投影，其输出张量形状依然是 `[batch_size, seq_len, dim]`。关键的一步发生在之后：我们利用 `dim = n_heads * head_dim` 这一关系，通过一次 `view` 或 `reshape` 操作，将最后一个维度 `dim` 逻辑上拆分为 `n_heads` 和 `head_dim` 两个维度，从而得到 `[batch_size, seq_len, n_heads, head_dim]` 这样的四维张量。这个形状的含义是：对于每个词元，我们都计算出了 `n_heads` 个独立的、维度为 `head_dim` 的 Query 向量表示。对 Key 向量 `xk` 的处理也是完全类似的。
 
 #### 2.2.3 代码实现 (`src/rope.py`)
 
 **1. `precompute_freqs_cis`**:
+
 ```python
-# code/C6/llama2/src/rope.py
 def precompute_freqs_cis(dim: int, end: int, theta: float = 10000.0) -> torch.Tensor:
     # 1. 计算频率：1 / (theta^(2i/dim))
     freqs = 1.0 / (theta ** (torch.arange(0, dim, 2)[: (dim // 2)].float() / dim))
@@ -135,11 +158,22 @@ def precompute_freqs_cis(dim: int, end: int, theta: float = 10000.0) -> torch.Te
     return freqs_cis
 ```
 
+其中 `torch.arange(0, dim, 2) / dim` 对应公式中的 `2i/dim`：`i` 实际遍历的是偶数维索引（长度为 `dim/2`）。
+
 **2. `reshape_for_broadcast`**: 辅助函数，用于将 `freqs_cis` 的形状调整为可以与 Q/K 向量进行广播乘法。
 
-**3. `apply_rotary_emb`**:
 ```python
-# code/C6/llama2/src/rope.py
+def reshape_for_broadcast(freqs_cis: torch.Tensor, x: torch.Tensor) -> torch.Tensor:
+    ndim = x.ndim
+    assert 0 <= 1 < ndim
+    assert freqs_cis.shape == (x.shape[1], x.shape[-1])
+    shape = [d if i == 1 or i == ndim - 1 else 1 for i, d in enumerate(x.shape)]
+    return freqs_cis.view(*shape)
+```
+
+**3. `apply_rotary_emb`**:
+
+```python
 def apply_rotary_emb(
     xq: torch.Tensor,
     xk: torch.Tensor,
@@ -150,21 +184,60 @@ def apply_rotary_emb(
     xk_ = torch.view_as_complex(xk.float().reshape(*xk.shape[:-1], -1, 2))
     
     # 准备广播
-    freqs_cis = reshape_for_broadcast(freqs_cis, xq_) # freqs_cis 针对 xq 变形
+    freqs_q = reshape_for_broadcast(freqs_cis, xq_)  # 针对 Q 的广播视图
     
     # 复数乘法即为旋转
-    xq_out = torch.view_as_real(xq_ * freqs_cis).flatten(3)
+    xq_out = torch.view_as_real(xq_ * freqs_q).flatten(3)
     
-    # K 向量可能与 Q 向量有不同的头数（GQA），所以 freqs_cis 需要重新变形
-    freqs_cis = reshape_for_broadcast(freqs_cis, xk_)
-    xk_out = torch.view_as_real(xk_ * freqs_cis).flatten(3)
+    # K 向量可能与 Q 向量有不同的头数（GQA），所以需单独生成广播视图
+    freqs_k = reshape_for_broadcast(freqs_cis, xk_)
+    xk_out = torch.view_as_real(xk_ * freqs_k).flatten(3)
     return xq_out.type_as(xq), xk_out.type_as(xq)
 ```
 -   `torch.view_as_complex` 将 `head_dim` 维的实数向量巧妙地看作 `head_dim/2` 维的复数向量。
 -   核心操作 `xq_ * freqs_cis` **正是旋转的实现**。在复数域中，两个复数相乘即表示幅角相加、模相乘。由于 `freqs_cis` 的模为1，这个操作就等价于将 `xq_` 向量旋转 `freqs_cis` 所代表的角度。
--   我们之前的 `AssertionError` 已被修复：通过分别为 Q 和 K `reshape_for_broadcast` 来兼容 GQA 带来的形状差异。
+-   通过分别为 Q 和 K 生成广播视图（`freqs_q` 与 `freqs_k`）来兼容 GQA 带来的形状差异。
 -   **参数 `theta`**: RoPE 的“基底”，控制位置编码的频率范围，`10000.0` 是一个标准值。
 -   **工程考量**: 在 `LlamaTransformer` 初始化时，预计算的长度通常会大于 `max_seq_len`（例如 `max_seq_len * 2`），为推理时处理更长序列提供“缓冲”，避免重新计算。
+
+#### 2.2.4 单元测试
+
+`rope.py` 文件包含了三个核心函数，因此我们的测试脚本也分别对它们进行验证，确保每个函数的输出形状都符合预期。
+
+```python
+# code/C6/llama2/src/rope.py
+if __name__ == "__main__":
+    # 准备参数和输入
+    batch_size, seq_len, n_heads, n_kv_heads, head_dim = 4, 16, 8, 2, 16
+    dim = n_heads * head_dim
+    n_rep = n_heads // n_kv_heads
+
+    # --- Test precompute_freqs_cis ---
+    print("--- Test precompute_freqs_cis ---")
+    freqs_cis = precompute_freqs_cis(dim=head_dim, end=seq_len * 2)
+    print("freqs_cis shape:", freqs_cis.shape)
+    assert freqs_cis.shape == (seq_len * 2, head_dim // 2)
+
+    # --- Test apply_rotary_emb ---
+    print("\n--- Test apply_rotary_emb ---")
+    xq = torch.randn(batch_size, seq_len, n_heads, head_dim)
+    xk = torch.randn(batch_size, seq_len, n_kv_heads, head_dim)
+    freqs_cis_slice = freqs_cis[:seq_len]
+    xq_out, xk_out = apply_rotary_emb(xq, xk, freqs_cis_slice)
+    print("xq shape (in/out):", xq.shape, xq_out.shape)
+    print("xk shape (in/out):", xk.shape, xk_out.shape)
+    assert xq.shape == xq_out.shape and xk.shape == xk_out.shape
+
+    # --- Test repeat_kv ---
+    print("\n--- Test repeat_kv ---")
+    cache_k = torch.randn(batch_size, seq_len, n_kv_heads, head_dim)
+    repeated_k = repeat_kv(cache_k, n_rep)
+    print("KV cache shape:", cache_k.shape)
+    print("Repeated KV shape:", repeated_k.shape)
+    assert repeated_k.shape == (batch_size, seq_len, n_heads, head_dim)
+    
+    print("\nRoPE tests passed!")
+```
 
 ### 2.3 分组查询注意力 (GQA)
 
@@ -172,7 +245,7 @@ def apply_rotary_emb(
 
 标准的**多头注意力 (Multi-Head Attention, MHA)** 为每个 Query 头都配备了一组独立的 Key 和 Value 头。这意味着 K 和 V 投影矩阵的尺寸以及推理时 KV 缓存的大小都与总头数 `n_heads` 成正比，当模型规模增大时，这部分开销变得非常显著。
 
-**分组查询注意力 (Grouped-Query Attention, GQA)**[^3] 是对此的核心优化。其思想是：**允许多个 Query 头共享同一组 Key 和 Value 头**。
+**分组查询注意力 (Grouped-Query Attention, GQA)**[^4] 是对此的核心优化。其思想是：**允许多个 Query 头共享同一组 Key 和 Value 头**。
 
 - **MHA**: 每个 Q 头都有自己的 K/V 头 (`n_heads` == `n_kv_heads`)。
 - **GQA**: 每组 Q 头共享一组 K/V 头 (`n_heads` > `n_kv_heads`)。
@@ -229,13 +302,65 @@ class GroupedQueryAttention(nn.Module):
 -   `wq`, `wk`, `wv` 的输出维度不同，分别对应 `n_heads` 和 `n_kv_heads`，直接体现了 GQA 的设计。
 -   在计算注意力分数之前，通过 `repeat_kv` 函数将 K 和 V 的头进行扩展，使其数量与 Q 头匹配，从而能够进行标准的注意力计算。
 
-`repeat_kv` 函数通过 `expand` 和 `reshape` 操作，高效地将 `[batch_size, seq_len, n_kv_heads, head_dim]` 的 K/V 张量复制 `n_rep` 次，使其形状变为 `[batch_size, seq_len, n_heads, head_dim]`，从而与 Q 张量的头数对齐。
+`repeat_kv` 函数通过 `expand` 和 `reshape` 操作，高效地将 `[batch_size, seq_len, n_kv_heads, head_dim]` 的 K/V 张量复制 `n_rep` 次，使其形状变为 `[batch_size, seq_len, n_kv_heads * n_rep, head_dim]`，从而与 Q 张量的头数对齐。
+
+```python
+# code/C6/llama2/src/rope.py
+def repeat_kv(x: torch.Tensor, n_rep: int) -> torch.Tensor:
+    batch_size, seq_len, n_kv_heads, head_dim = x.shape
+    if n_rep == 1:
+        return x
+    return (
+        x[:, :, :, None, :]
+        .expand(batch_size, seq_len, n_kv_heads, n_rep, head_dim)
+        .reshape(batch_size, seq_len, n_kv_heads * n_rep, head_dim)
+    )
+```
+
+#### 2.3.4 单元测试
+
+GQA 模块的测试需要完整初始化 `GroupedQueryAttention` 类，并为其 `forward` 方法准备好所有必需的输入，包括模拟的 `freqs_cis`。测试的核心是验证经过整个注意力计算流程后，输出张量的形状是否与输入一致。
+
+```python
+# code/C6/llama2/src/attention.py
+if __name__ == "__main__":
+    # 准备参数和输入
+    batch_size, seq_len, dim = 4, 16, 128
+    n_heads, n_kv_heads = 8, 2
+    head_dim = dim // n_heads
+
+    # 初始化注意力模块
+    attention = GroupedQueryAttention(
+        dim=dim,
+        n_heads=n_heads,
+        n_kv_heads=n_kv_heads,
+        max_batch_size=batch_size,
+        max_seq_len=seq_len,
+    )
+
+    # 准备输入
+    x = torch.randn(batch_size, seq_len, dim)
+    freqs_cis = precompute_freqs_cis(dim=head_dim, end=seq_len * 2)
+    freqs_cis_slice = freqs_cis[:seq_len]
+
+    # 执行前向传播
+    output = attention(x, start_pos=0, freqs_cis=freqs_cis_slice)
+
+    # 验证输出形状
+    print("--- GroupedQueryAttention Test ---")
+    print("Input shape:", x.shape)
+    print("Output shape:", output.shape)
+    assert x.shape == output.shape, "Shape mismatch"
+    print("GroupedQueryAttention test passed!")
+```
+
+> 注意：请以模块方式运行该文件以保证相对导入生效：`python -m code.C6.llama2.src.attention`。仓库已在文件顶部加入 `from .rope import precompute_freqs_cis` 以满足自测依赖。
 
 ### 2.4 SwiGLU 前馈网络
 
 #### 2.4.1 设计思路
 
-Transformer 中的前馈网络 (Feed-Forward Network, FFN) 提供了核心的非线性计算能力，通常由两个线性层和一个 ReLU 激活函数构成。Llama2 采用了一种更先进的变体 **SwiGLU**[^4]，它被证明能带来更好的性能。
+Transformer 中的前馈网络 (Feed-Forward Network, FFN) 提供了核心的非线性计算能力，通常由两个线性层和一个 ReLU 激活函数构成。Llama2 采用了一种更先进的变体 **SwiGLU**[^5]，它被证明能带来更好的性能。
 
 它的核心是引入**门控机制**：
 - 它使用三个线性变换 (`W`, `V`, `W2`) 而不是两个。
@@ -280,6 +405,38 @@ class FeedForward(nn.Module):
 
 - `torch.nn.functional.silu` 就是 PyTorch 内置的 Swish 激活函数。
 - 整个 `forward` 函数精确地实现了 SwiGLU 的公式。
+
+#### 2.4.4 单元测试
+
+最后，为 `FeedForward` 模块添加测试代码，验证其能否正确处理输入张量并返回相同形状的输出。
+
+```python
+# code/C6/llama2/src/ffn.py
+if __name__ == "__main__":
+    # 准备参数和输入
+    batch_size, seq_len, dim = 4, 16, 128
+    
+    # 初始化 FFN 模块
+    ffn = FeedForward(
+        dim=dim,
+        hidden_dim=4 * dim,
+        multiple_of=256,
+        ffn_dim_multiplier=None
+    )
+
+    # 准备输入
+    x = torch.randn(batch_size, seq_len, dim)
+
+    # 执行前向传播
+    output = ffn(x)
+
+    # 验证输出形状
+    print("--- FeedForward (SwiGLU) Test ---")
+    print("Input shape:", x.shape)
+    print("Output shape:", output.shape)
+    assert x.shape == output.shape, "Shape mismatch"
+    print("FeedForward test passed!")
+```
 
 ## 三、模型组装与前向传播
 
@@ -352,16 +509,14 @@ class FeedForward(nn.Module):
         3.  循环调用 `TransformerBlock`，逐层处理特征。
         4.  最终通过 `norm` 和 `output` 层得到 logits。
 
-## 四、整体验证与排查清单
+## 四、整体验证与推理实战
 
 ### 4.1 端到端快速验证
 
 在所有组件实现并组装后，我们可以通过一个最小化的脚本来验证整个 `LlamaTransformer` 模型的输入输出是否符合预期。
 
-在 `code/C6/llama2/` 目录下，有一个 `quickstart.py` 脚本：
-
 ```python
-# code/C6/llama2/quickstart.py
+# code/C6/llama2/main.py
 import torch
 from src.transformer import LlamaTransformer
 
@@ -392,12 +547,6 @@ if __name__ == "__main__":
     main()
 ```
 
-在项目根目录下运行此脚本：
-
-```bash
-python code/C6/llama2/quickstart.py
-```
-
 你将会看到如下输出，这证明我们的模型已经能够正确处理输入并返回符合预期的 logits 张量：
 
 ```text
@@ -405,52 +554,6 @@ logits shape: (2, 16, 1000)
 ```
 
 这个脚本实例化了一个小型的 `LlamaTransformer`，并用一个随机的 `tokens` 张量（代表一个批次、长度为16的两个句子）作为输入，执行了模型的前向传播，最终验证了输出 `logits` 的形状是否与 `[batch_size, seq_len, vocab_size]` 匹配。
-
-### 4.2 推理实战与常见问题
-
-从零实现模型不仅要跑通前向，更要理解它在实际推理（生成）场景下的工作模式。
-
-#### 4.2.1 逐 Token 生成（自回归）流程
-
-大语言模型的生成过程是一个逐 Token 的自回归循环。KV 缓存机制正是在此环节加速推理的关键：
-
-1.  **初始输入 (Prefill 阶段)**：
-    -   输入：`tokens` 是完整的提示（Prompt），例如 `[B, 100]`。`start_pos = 0`。
-    -   计算：模型对全部 100 个 token 执行一次完整的前向传播。
-    -   缓存：计算过程中，每个注意力层的 K 和 V 向量（对应 `0` 到 `99` 的位置）被计算并存入 `cache_k` 和 `cache_v`。
-    -   输出：得到 `logits`，通过采样（如 `argmax`）得到第 101 个 token。
-
-2.  **增量生成 (Decoding 阶段)**：
-    -   输入：`tokens` 仅为上一步生成的单个 token，例如 `[B, 1]`。`start_pos` 更新为 `100`。
-    -   计算：模型仅对这 1 个 token 进行前向传播。在注意力层，新的 Q 向量被计算出来；而 K 和 V 向量则从 KV 缓存中**直接读取**（包含了 `0` 到 `99` 位置的信息），并将当前计算出的新 K/V 向量追加进去。
-    -   效率：计算量从处理 `N` 个 token 锐减到处理 1 个 token，这是推理加速的核心。
-    -   循环：重复此过程，每次传入最新生成的 token，`start_pos` 加一，直到生成结束符或达到最大长度。
-
-#### 4.2.2 KV 缓存管理
-
-这是最容易出错的地方，直接影响推理的正确性和性能。
-
--   **训练与推理的隔离**：训练时，每个 batch 都应是独立的。代码中 `if self.training and start_pos == 0:` 确保了在每个新序列开始时清空缓存，防止样本间数据污染。
--   **切断计算图 (`.detach()`)**：向缓存写入 K/V 时，必须使用 `.detach()`。因为缓存中的 K/V 会被后续步骤复用，如果不切断梯度，反向传播时计算图会无限增长，导致显存爆炸。
--   **设备一致性**：`cache_k` 和 `cache_v` 是 `nn.Module` 的缓冲区（buffer），会随着 `model.to(device)` 被自动移动到指定设备。在 `forward` 中应避免不必要的 `.to()` 调用，确保所有张量在同一设备上。
-
-#### 4.2.3 因果掩码的构造
-
-因果掩码确保了模型在预测当前 token 时，不会看到未来的 token。
-
--   **训练**：当 `seq_len > 1` 时，需要一个上三角矩阵作为掩码，如 `torch.triu(..., diagonal=1)`。
--   **推理**：当 `seq_len = 1` 且 `start_pos > 0` 时，模型正在逐个生成 token。此时的 Q 只有一个，它可以关注到缓存中所有的历史 K/V，所以理论上**不需要掩码**（因为没有未来的 token 可以被关注）。代码中 `if seq_len > 1:` 的判断正确地处理了这一点。`torch.hstack` 的逻辑则是为了在 `seq_len > 1` 的情况下，正确地让当前 Query 关注到缓存中的历史信息。
-
-#### 4.2.4 数值精度
-
--   **Softmax in FP32**：在注意力分数计算中，`scores.softmax().type_as(xq)` 是一个关键实践。在 `bfloat16` 或 `float16` 精度下，Softmax 的指数计算容易发生上溢或下溢，导致结果为 `NaN` 或 `0`。临时切换到 `float32` 计算可以保证数值稳定性。
--   **推荐精度**：现代 GPU（如 Ampere 架构及以后）上，`bfloat16` 是训练和推理的理想选择，它在保持数值范围的同时提供了接近 `float16` 的性能。
-
-#### 4.2.5 维度匹配约束
-
--   `dim % n_heads == 0`: 隐藏层维度必须能被总头数整除。
--   `n_heads % n_kv_heads == 0`: Q 头数必须是 KV 头数的整数倍。
--   `head_dim` 必须为偶数: RoPE 的复数转换要求 `head_dim` 能被 2 整除。
 
 ## 五、小结
 
@@ -460,10 +563,12 @@ logits shape: (2, 16, 1000)
 
 ## 参考文献
 
-[^1]: [Zhang, J., & Sennrich, R. (2019). *Root Mean Square Layer Normalization*. NeurIPS 2019.](https://arxiv.org/abs/1910.07467)
+[^1]: [Touvron, H., Martin, L., Stone, K., et al. (2023). *Llama 2: Open Foundation and Fine-Tuned Chat Models*.](https://arxiv.org/abs/2307.09288)
 
-[^2]: [Su, J., Lu, Y., Pan, S., et al. (2021). *RoFormer: Enhanced Transformer with Rotary Position Embedding*.](https://arxiv.org/abs/2104.09864)
+[^2]: [Zhang, J., & Sennrich, R. (2019). *Root Mean Square Layer Normalization*. NeurIPS 2019.](https://arxiv.org/abs/1910.07467)
 
-[^3]: [Ainslie, J., Dossel, J., Ontanon, S., et al. (2023). *GQA: Training Generalized Multi-Query Attention Models from Multi-Head Checkpoints*.](https://arxiv.org/abs/2305.13245)
+[^3]: [Su, J., Lu, Y., Pan, S., et al. (2021). *RoFormer: Enhanced Transformer with Rotary Position Embedding*.](https://arxiv.org/abs/2104.09864)
 
-[^4]: [Shazeer, N. (2020). *GLU Variants Improve Transformer*.](https://arxiv.org/abs/2002.05202)
+[^4]: [Ainslie, J., Dossel, J., Ontanon, S., et al. (2023). *GQA: Training Generalized Multi-Query Attention Models from Multi-Head Checkpoints*.](https://arxiv.org/abs/2305.13245)
+
+[^5]: [Shazeer, N. (2020). *GLU Variants Improve Transformer*.](https://arxiv.org/abs/2002.05202)
