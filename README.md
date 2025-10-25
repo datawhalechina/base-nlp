@@ -76,7 +76,7 @@
 
 ### 第三部分：微调量化篇
 - **第1章：参数高效微调**
-    - [ ] [PEFT 技术综述](./docs/chapter11/01_peft.md)
+    - [x] [PEFT 技术综述](./docs/chapter11/01_peft.md)
     - [ ] [LORA 方法详解与实战](./docs/chapter9/02_lora.md)
     - [ ] [QLORA]()
 - **第2章：高级微调技术**
