@@ -37,7 +37,7 @@ PEFT 的思想借鉴了计算机视觉领域的迁移学习（Transfer Learning�
 `Adapter Tuning` 是 PEFT 领域的开创性工作之一，由 Google 在 2019 年为 BERT 模型设计。[^2] 其思路是在 Transformer 的每个块中 **插入** 小型的“适配器”（Adapter）模块。
 
 <p align="center">
-  <img src="./images/12_1_1.png" width="80%" alt="Adapter Tuning 结构" />
+  <img src="./images/12_1_1.png" width="60%" alt="Adapter Tuning 结构" />
   <br />
   <em>图 12-1：Adapter Tuning 结构</em>
 </p>
