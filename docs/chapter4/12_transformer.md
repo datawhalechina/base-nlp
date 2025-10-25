@@ -412,43 +412,22 @@ Transformer 主要使用以下两种掩码：
 3.  输入 `[BOS], token_1, token_2`，生成第三个词 `token_3`。
 4.  ... 直到生成 `[EOS]`（结束符）或达到最大长度。
 
-如果按照这个流程直接计算，效率会非常低下。例如，在生成 
-`token_3` 时，模型需要为 `[BOS]` 和 `token_1` 重新计算
-它们的 Q, K, V 向量并参与注意力计算。但事实上，`[BOS]` 
-和 `token_1` 的 Key 和 Value 向量在之前的步骤中已经被计
-算过了。
+如果按照这个流程直接计算，效率会非常低下。例如，在生成 `token_3` 时，模型需要为 `[BOS]` 和 `token_1` 重新计算它们的 Q, K, V 向量并参与注意力计算。但事实上，`[BOS]` 和 `token_1` 的 Key 和 Value 向量在之前的步骤中已经被计算过了。
 
 为解决这种冗余计算，推理时会采用一项关键的优化技术：**KV 缓存**。
--   **基本原理**：对于解码器的每一层，都缓存下截至当前时
-刻已经计算出的所有词元的 **Key** 和 **Value** 向量。
--   **工作流程**：在生成第 $t$ 个词元时，模型只需要为当
-前输入的第 $t-1$ 个词元计算出它自己的 $q_{t-1}, k_
-{t-1}, v_{t-1}$。然后，它从缓存中取出历史的 $K_{cache} 
-= [k_0, k_1, ..., k_{t-2}]$ 和 $V_{cache} = [v_0, 
-v_1, ..., v_{t-2}]$。最后，将新的 $k_{t-1}, v_{t-1}$ 
-追加到缓存中，并用 $q_{t-1}$ 与更新后的完整 $K_
-{cache}, V_{cache}$ 进行注意力计算。
+-   **基本原理**：对于解码器的每一层，都缓存下截至当前时刻已经计算出的所有词元的 **Key** 和 **Value** 向量。
+-   **工作流程**：在生成第 $t$ 个词元时，模型只需要为当前输入的第 $t-1$ 个词元计算出它自己的 $q_{t-1}, k_{t-1}, v_{t-1}$。然后，它从缓存中取出历史的 $K_{cache} = [k_0, k_1, ..., k_{t-2}]$ 和 $V_{cache} = [v_0, v_1, ..., v_{t-2}]$。最后，将新的 $k_{t-1}, v_{t-1}$ 追加到缓存中，并用 $q_{t-1}$ 与更新后的完整 $K_{cache}, V_{cache}$ 进行注意力计算。
 
-通过 KV 缓存，每次解码步骤的计算量从与整个已生成序列长度
-的平方（$O(T^2)$）相关，降低到只与序列长度（$O(T)$）线性相关，极大地加速了文本生成的速度，是实现高效大模型推理的常用技术之一。需要注意，KV 缓存占用会随步数线性增长（$O
- (T)$），在多层多头设置下需关注显存开销。
+通过 KV 缓存，每次解码步骤的计算量从与整个已生成序列长度的平方（$O(T^2)$）相关，降低到只与序列长度（$O(T)$）线性相关，极大地加速了文本生成的速度，是实现高效大模型推理的常用技术之一。需要注意，KV 缓存占用会随步数线性增长（$O(T)$），在多层多头设置下需关注显存开销。
 
 ---
 
 ## 参考文献
 
-[^1]: [Vaswani, A., Shazeer, N., Parmar, N., et al. 
-(2017). *Attention Is All You Need*. NeurIPS 2017.]
-(https://arxiv.org/abs/1706.03762)
+[^1]: [Vaswani, A., Shazeer, N., Parmar, N., et al. (2017). *Attention Is All You Need*. NeurIPS 2017.](https://arxiv.org/abs/1706.03762)
 
-[^2]: [Hendrycks, D., Gimpel, K. (2016). *Gaussian 
-Error Linear Units (GELUs)*.](https://arxiv.org/abs/
-1606.08415)
+[^2]: [Hendrycks, D., Gimpel, K. (2016). *Gaussian Error Linear Units (GELUs)*.](https://arxiv.org/abs/1606.08415)
 
-[^3]: [Ba, J. L., Kiros, J. R., Hinton, G. E. 
-(2016). *Layer Normalization*.](https://arxiv.org/
-abs/1607.06450)
+[^3]: [Ba, J. L., Kiros, J. R., Hinton, G. E. (2016). *Layer Normalization*.](https://arxiv.org/abs/1607.06450)
 
-[^4]: [Su, J., Lu, Y., Pan, S., Wen, Y. (2021). 
-*RoFormer: Enhanced Transformer with Rotary Position 
-Embedding*.](https://arxiv.org/abs/2104.09864)
+[^4]: [Su, J., Lu, Y., Pan, S., Wen, Y. (2021). *RoFormer: Enhanced Transformer with Rotary Position Embedding*.](https://arxiv.org/abs/2104.09864)
