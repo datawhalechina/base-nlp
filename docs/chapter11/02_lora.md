@@ -19,7 +19,7 @@ $$ \Delta W = B \cdot A $$
 其中，$W_0 \in \mathbb{R}^{d \times k}$，低秩分解后的 $B \in \mathbb{R}^{d \times r}$，$A \in \mathbb{R}^{r \times k}$，而秩 $r \ll \min(d, k)$。
 
 <p align="center">
-  <img src="./images/12_2_1.png" width="60%" alt="LoRA 结构" />
+  <img src="./images/12_2_1.png" width="50%" alt="LoRA 结构" />
   <br />
   <em>图 12-7：LoRA 结构示意图</em>
 </p>
@@ -87,7 +87,7 @@ LoRA 虽然强大，但也带来了新的超参数选择问题：应该对哪些
 实验表明，为所有矩阵和所有层级设置一个统一的、固定的秩 $r$，远非最优解。不同任务、不同模型层、不同权重矩阵，其“可塑性”和对任务的重要性是不同的，它们理应被区别对待。手动去探索这个巨大的超参组合空间几乎是不可能的。
 
 <p align="center">
-  <img src="./images/12_2_2.png" width="80%" alt="AdaLoRA 动机" />
+  <img src="./images/12_2_2.png" width="70%" alt="AdaLoRA 动机" />
   <br />
   <em>图 12-8：不同模块与层级的微调性能对比</em>
 </p>
@@ -166,7 +166,7 @@ $$
 这种“先探索、后收敛”的策略，让模型有更充分的机会去发现哪些权重真正重要，从而做出更优的预算分配决策。最终，AdaLoRA 实现了在训练过程中对秩的**动态调整**和在不同模块间的**智能分配**。
 
 <p align="center">
-  <img src="./images/12_2_3.png" width="80%" alt="AdaLoRA 结果" />
+  <img src="./images/12_2_3.png" width="90%" alt="AdaLoRA 结果" />
   <br />
   <em>图 12-9：AdaLoRA 最终秩分配结果示意图</em>
 </p>
