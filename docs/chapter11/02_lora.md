@@ -37,7 +37,7 @@ $$ h = W_0 \cdot x + \Delta W \cdot x = W_0 \cdot x + (B \cdot A) \cdot x $$
 > **初始化与缩放技巧**
 >
 > - **初始化**：如上图所示，旁路矩阵有特殊的初始化方式。矩阵 A 通常使用高斯分布进行随机初始化（ $A = \mathcal{N}(0, \sigma^2)$ ），而矩阵 B 则初始化为全零（ $B=0$ ）。这样做可以确保在训练开始时，旁路输出为零，微调是从原始的预训练模型状态开始的，保证了训练初期的稳定性。
-> - **缩放**：LoRA 的前向计算公式会包含一个缩放因子 $s$： $h = W_0 \cdot x + s \cdot (B \cdot A) \cdot x$。这个 $s$ 通常设为 $\alpha/r$，其中 $\alpha$ 是一个可调超参。这个缩放操作有助于在调整秩 $r$ 时，减少对学习率等其他超参数的重新调整需求，让训练过程更稳定。
+> - **缩放**：LoRA 的前向计算公式会包含一个缩放因子 $s$: $h = W_0 \cdot x + s \cdot (B \cdot A) \cdot x$。这个 $s$ 通常设为 $\alpha/r$，其中 $\alpha$ 是一个可调超参。这个缩放操作有助于在调整秩 $r$ 时，减少对学习率等其他超参数的重新调整需求，让训练过程更稳定。
 
 ## 二、LoRA 的优势与实践
 
@@ -58,10 +58,54 @@ LoRA 虽然强大，但也带来了新的超参数选择问题：应该对哪些
 
 第一个问题是：**应该对哪些权重矩阵应用 LoRA？**
 
-<p align="center">
-<table border=1 style='margin: auto; width: max-content;'><tr><td style='text-align: center;'></td><td colspan="7" style='text-align: center;'># of Trainable Parameters = 18M</td></tr><tr><td style='text-align: center;'>Weight Type</td><td style='text-align: center;'>W<sub>q</sub></td><td style='text-align: center;'>W<sub>k</sub></td><td style='text-align: center;'>W<sub>v</sub></td><td style='text-align: center;'>W<sub>o</sub></td><td style='text-align: center;'>W<sub>q</sub>, W<sub>k</sub></td><td style='text-align: center;'>W<sub>q</sub>, W<sub>v</sub></td><td style='text-align: center;'>W<sub>q</sub>, W<sub>k</sub>, W<sub>v</sub>, W<sub>o</sub></td></tr><tr><td style='text-align: center;'>Rank <i>r</i></td><td style='text-align: center;'>8</td><td style='text-align: center;'>8</td><td style='text-align: center;'>8</td><td style='text-align: center;'>8</td><td style='text-align: center;'>4</td><td style='text-align: center;'>4</td><td style='text-align: center;'>2</td></tr><tr><td style='text-align: center;'>WikiSQL (&plusmn;0.5%)</td><td style='text-align: center;'>70.4</td><td style='text-align: center;'>70.0</td><td style='text-align: center;'>73.0</td><td style='text-align: center;'>73.2</td><td style='text-align: center;'>71.4</td><td style='text-align: center;'>73.7</td><td style='text-align: center;'>73.7</td></tr><tr><td style='text-align: center;'>MultiNLI (&plusmn;0.1%)</td><td style='text-align: center;'>91.0</td><td style='text-align: center;'>90.8</td><td style='text-align: center;'>91.0</td><td style='text-align: center;'>91.3</td><td style='text-align: center;'>91.3</td><td style='text-align: center;'>91.3</td><td style='text-align: center;'>91.7</td></tr></table>
-<br />
-<em>表 12-1：不同注意力权重上的 LoRA 微调效果（来源：LoRA 原始论文 Table 5）</em>
+<table border="1" style="display: block; margin: 0 auto; width: max-content; text-align: center;">
+  <tr>
+    <td></td>
+    <td colspan="7"># of Trainable Parameters = 18M</td>
+  </tr>
+  <tr>
+    <td>Weight Type</td>
+    <td>W<sub>q</sub></td>
+    <td>W<sub>k</sub></td>
+    <td>W<sub>v</sub></td>
+    <td>W<sub>o</sub></td>
+    <td>W<sub>q</sub>, W<sub>k</sub></td>
+    <td>W<sub>q</sub>, W<sub>v</sub></td>
+    <td>W<sub>q</sub>, W<sub>k</sub>, W<sub>v</sub>, W<sub>o</sub></td>
+  </tr>
+  <tr>
+    <td>Rank <i>r</i></td>
+    <td>8</td>
+    <td>8</td>
+    <td>8</td>
+    <td>8</td>
+    <td>4</td>
+    <td>4</td>
+    <td>2</td>
+  </tr>
+  <tr>
+    <td>WikiSQL (&plusmn;0.5%)</td>
+    <td>70.4</td>
+    <td>70.0</td>
+    <td>73.0</td>
+    <td>73.2</td>
+    <td>71.4</td>
+    <td>73.7</td>
+    <td>73.7</td>
+  </tr>
+  <tr>
+    <td>MultiNLI (&plusmn;0.1%)</td>
+    <td>91.0</td>
+    <td>90.8</td>
+    <td>91.0</td>
+    <td>91.3</td>
+    <td>91.3</td>
+    <td>91.3</td>
+    <td>91.7</td>
+  </tr>
+</table>
+<p style="text-align: center;">
+  <em>表 12-1：不同注意力权重上的 LoRA 微调效果（来源：LoRA 原始论文 Table 5）</em>
 </p>
 
 通过 **表 12-1** 的数据可以看出，那就是应当**优先选择注意力权重**。在固定的可训练参数预算下，将 LoRA 应用于更多的权重类型（特别是 W<sub>q</sub> 和 W<sub>v</sub> 的组合）比增大单一权重类型的秩能带来更好的性能。因此，一个高效的策略是**仅在注意力模块中应用 LoRA，并冻结其他模块（如前馈网络 FFN）的参数**。
@@ -116,7 +160,7 @@ $$
 
 有了 SVD 这种分解结构，AdaLoRA 接下来要解决的问题是：**如何衡量每个“更新分量”的重要性？**
 
-它将每个奇异值和其对应的左右奇异向量组合成一个“**三元组**” $\mathcal{G}_{k,i} = \{P_{k,* i}, \lambda_{k,i}, Q_{k,i *}\}$。在训练过程中，AdaLoRA 会为每个三元组计算一个重要性分数 $S_{k,i}$。这个分数是基于对三元组中每个参数 $w$ 的重要性 $s(w)$ 进行聚合得到的。
+它将每个奇异值和其对应的左右奇异向量组合成一个“**三元组**” $\mathcal{G}_{k,i} = \{P_{k,\ast i}, \lambda_{k,i}, Q_{k,i \ast}\}$。在训练过程中，AdaLoRA 会为每个三元组计算一个重要性分数 $S_{k,i}$。这个分数是基于对三元组中每个参数 $w$ 的重要性 $s(w)$ 进行聚合得到的。
 
 参数 $w$ 的重要性 $s(w)$ 又由两部分相乘得到：平滑后的**参数敏感度 (Sensitivity)** $\bar{I}(w)$ 和**不确定性 (Uncertainty)** $\bar{U}(w)$。
 
