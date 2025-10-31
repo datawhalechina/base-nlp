@@ -58,65 +58,130 @@ LoRA 虽然强大，但也带来了新的超参数选择问题：应该对哪些
 
 第一个问题是：**应该对哪些权重矩阵应用 LoRA？**
 
-<table border="1" style="display: block; margin: 0 auto; width: max-content; text-align: center;">
-  <tr>
-    <td></td>
-    <td colspan="7"># of Trainable Parameters = 18M</td>
-  </tr>
-  <tr>
-    <td>Weight Type</td>
-    <td>W<sub>q</sub></td>
-    <td>W<sub>k</sub></td>
-    <td>W<sub>v</sub></td>
-    <td>W<sub>o</sub></td>
-    <td>W<sub>q</sub>, W<sub>k</sub></td>
-    <td>W<sub>q</sub>, W<sub>v</sub></td>
-    <td>W<sub>q</sub>, W<sub>k</sub>, W<sub>v</sub>, W<sub>o</sub></td>
-  </tr>
-  <tr>
-    <td>Rank <i>r</i></td>
-    <td>8</td>
-    <td>8</td>
-    <td>8</td>
-    <td>8</td>
-    <td>4</td>
-    <td>4</td>
-    <td>2</td>
-  </tr>
-  <tr>
-    <td>WikiSQL (&plusmn;0.5%)</td>
-    <td>70.4</td>
-    <td>70.0</td>
-    <td>73.0</td>
-    <td>73.2</td>
-    <td>71.4</td>
-    <td>73.7</td>
-    <td>73.7</td>
-  </tr>
-  <tr>
-    <td>MultiNLI (&plusmn;0.1%)</td>
-    <td>91.0</td>
-    <td>90.8</td>
-    <td>91.0</td>
-    <td>91.3</td>
-    <td>91.3</td>
-    <td>91.3</td>
-    <td>91.7</td>
-  </tr>
+<div align="center">
+
+<table border="1" style="margin: 0 auto;">
+<tr>
+  <td style="text-align: center;"></td>
+  <td colspan="7" style="text-align: center;"><strong># of Trainable Parameters = 18M</strong></td>
+</tr>
+<tr>
+  <td style="text-align: center;"><strong>Weight Type</strong></td>
+  <td style="text-align: center;">W<sub>q</sub></td>
+  <td style="text-align: center;">W<sub>k</sub></td>
+  <td style="text-align: center;">W<sub>v</sub></td>
+  <td style="text-align: center;">W<sub>o</sub></td>
+  <td style="text-align: center;">W<sub>q</sub>, W<sub>k</sub></td>
+  <td style="text-align: center;">W<sub>q</sub>, W<sub>v</sub></td>
+  <td style="text-align: center;">W<sub>q</sub>, W<sub>k</sub>, W<sub>v</sub>, W<sub>o</sub></td>
+</tr>
+<tr>
+  <td style="text-align: center;"><strong>Rank <i>r</i></strong></td>
+  <td style="text-align: center;">8</td>
+  <td style="text-align: center;">8</td>
+  <td style="text-align: center;">8</td>
+  <td style="text-align: center;">8</td>
+  <td style="text-align: center;">4</td>
+  <td style="text-align: center;">4</td>
+  <td style="text-align: center;">2</td>
+</tr>
+<tr>
+  <td style="text-align: center;"><strong>WikiSQL (&plusmn;0.5%)</strong></td>
+  <td style="text-align: center;">70.4</td>
+  <td style="text-align: center;">70.0</td>
+  <td style="text-align: center;">73.0</td>
+  <td style="text-align: center;">73.2</td>
+  <td style="text-align: center;">71.4</td>
+  <td style="text-align: center;">73.7</td>
+  <td style="text-align: center;">73.7</td>
+</tr>
+<tr>
+  <td style="text-align: center;"><strong>MultiNLI (&plusmn;0.1%)</strong></td>
+  <td style="text-align: center;">91.0</td>
+  <td style="text-align: center;">90.8</td>
+  <td style="text-align: center;">91.0</td>
+  <td style="text-align: center;">91.3</td>
+  <td style="text-align: center;">91.3</td>
+  <td style="text-align: center;">91.3</td>
+  <td style="text-align: center;">91.7</td>
+</tr>
 </table>
-<p style="text-align: center;">
-  <em>表 12-1：不同注意力权重上的 LoRA 微调效果（来源：LoRA 原始论文 Table 5）</em>
-</p>
+
+<p><em>表 12-1：不同注意力权重上的 LoRA 微调效果（来源：LoRA 原始论文 Table 5）</em></p>
+
+</div>
 
 通过 **表 12-1** 的数据可以看出，那就是应当**优先选择注意力权重**。在固定的可训练参数预算下，将 LoRA 应用于更多的权重类型（特别是 W<sub>q</sub> 和 W<sub>v</sub> 的组合）比增大单一权重类型的秩能带来更好的性能。因此，一个高效的策略是**仅在注意力模块中应用 LoRA，并冻结其他模块（如前馈网络 FFN）的参数**。
 
 第二个问题是：**秩 r 的选择是不是越大越好？**
 
-<p align="center">
-<table border=1 style='margin: auto; width: max-content;'><tr><td style='text-align: center;'></td><td style='text-align: center;'>Weight Type</td><td style='text-align: center;'>r=1</td><td style='text-align: center;'>r=2</td><td style='text-align: center;'>r=4</td><td style='text-align: center;'>r=8</td><td style='text-align: center;'>r=64</td></tr><tr><td rowspan="3">WikiSQL(&plusmn;0.5%)</td><td style='text-align: center;'>W<sub>q</sub></td><td style='text-align: center;'>68.8</td><td style='text-align: center;'>69.6</td><td style='text-align: center;'>70.5</td><td style='text-align: center;'>70.4</td><td style='text-align: center;'>70.0</td></tr><tr><td style='text-align: center;'>W<sub>q</sub>, W<sub>v</sub></td><td style='text-align: center;'>73.4</td><td style='text-align: center;'>73.3</td><td style='text-align: center;'>73.7</td><td style='text-align: center;'>73.8</td><td style='text-align: center;'>73.5</td></tr><tr><td style='text-align: center;'>W<sub>q</sub>, W<sub>k</sub>, W<sub>v</sub>, W<sub>o</sub></td><td style='text-align: center;'>74.1</td><td style='text-align: center;'>73.7</td><td style='text-align: center;'>74.0</td><td style='text-align: center;'>74.0</td><td style='text-align: center;'>73.9</td></tr><tr><td rowspan="3">MultiNLI (&plusmn;0.1%)</td><td style='text-align: center;'>W<sub>q</sub></td><td style='text-align: center;'>90.7</td><td style='text-align: center;'>90.9</td><td style='text-align: center;'>91.1</td><td style='text-align: center;'>90.7</td><td style='text-align: center;'>90.7</td></tr><tr><td style='text-align: center;'>W<sub>q</sub>, W<sub>v</sub></td><td style='text-align: center;'>91.3</td><td style='text-align: center;'>91.4</td><td style='text-align: center;'>91.3</td><td style='text-align: center;'>91.6</td><td style='text-align: center;'>91.4</td></tr><tr><td style='text-align: center;'>W<sub>q</sub>, W<sub>k</sub>, W<sub>v</sub>, W<sub>o</sub></td><td style='text-align: center;'>91.2</td><td style='text-align: center;'>91.7</td><td style='text-align: center;'>91.7</td><td style='text-align: center;'>91.5</td><td style='text-align: center;'>91.4</td></tr></table>
-<br />
-<em>表 12-2：不同秩 r 对 LoRA 微调效果的影响（来源：LoRA 原始论文 Table 6）</em>
-</p>
+<div align="center">
+
+<table border="1" style="margin: 0 auto;">
+<tr>
+  <td style="text-align: center;"></td>
+  <td style="text-align: center;"><strong>Weight Type</strong></td>
+  <td style="text-align: center;"><strong>r=1</strong></td>
+  <td style="text-align: center;"><strong>r=2</strong></td>
+  <td style="text-align: center;"><strong>r=4</strong></td>
+  <td style="text-align: center;"><strong>r=8</strong></td>
+  <td style="text-align: center;"><strong>r=64</strong></td>
+</tr>
+<tr>
+  <td rowspan="3" style="text-align: center;"><strong>WikiSQL(&plusmn;0.5%)</strong></td>
+  <td style="text-align: center;">W<sub>q</sub></td>
+  <td style="text-align: center;">68.8</td>
+  <td style="text-align: center;">69.6</td>
+  <td style="text-align: center;">70.5</td>
+  <td style="text-align: center;">70.4</td>
+  <td style="text-align: center;">70.0</td>
+</tr>
+<tr>
+  <td style="text-align: center;">W<sub>q</sub>, W<sub>v</sub></td>
+  <td style="text-align: center;">73.4</td>
+  <td style="text-align: center;">73.3</td>
+  <td style="text-align: center;">73.7</td>
+  <td style="text-align: center;">73.8</td>
+  <td style="text-align: center;">73.5</td>
+</tr>
+<tr>
+  <td style="text-align: center;">W<sub>q</sub>, W<sub>k</sub>, W<sub>v</sub>, W<sub>o</sub></td>
+  <td style="text-align: center;">74.1</td>
+  <td style="text-align: center;">73.7</td>
+  <td style="text-align: center;">74.0</td>
+  <td style="text-align: center;">74.0</td>
+  <td style="text-align: center;">73.9</td>
+</tr>
+<tr>
+  <td rowspan="3" style="text-align: center;"><strong>MultiNLI (&plusmn;0.1%)</strong></td>
+  <td style="text-align: center;">W<sub>q</sub></td>
+  <td style="text-align: center;">90.7</td>
+  <td style="text-align: center;">90.9</td>
+  <td style="text-align: center;">91.1</td>
+  <td style="text-align: center;">90.7</td>
+  <td style="text-align: center;">90.7</td>
+</tr>
+<tr>
+  <td style="text-align: center;">W<sub>q</sub>, W<sub>v</sub></td>
+  <td style="text-align: center;">91.3</td>
+  <td style="text-align: center;">91.4</td>
+  <td style="text-align: center;">91.3</td>
+  <td style="text-align: center;">91.6</td>
+  <td style="text-align: center;">91.4</td>
+</tr>
+<tr>
+  <td style="text-align: center;">W<sub>q</sub>, W<sub>k</sub>, W<sub>v</sub>, W<sub>o</sub></td>
+  <td style="text-align: center;">91.2</td>
+  <td style="text-align: center;">91.7</td>
+  <td style="text-align: center;">91.7</td>
+  <td style="text-align: center;">91.5</td>
+  <td style="text-align: center;">91.4</td>
+</tr>
+</table>
+
+<p><em>表 12-2：不同秩 r 对 LoRA 微调效果的影响（来源：LoRA 原始论文 Table 6）</em></p>
+
+</div>
 
 **表 12-2** 的实验结果颠覆了传统直觉，证明了“小即是美”的观点。我们可以看到，一个非常小的秩 <i>r</i>（例如 4, 8 甚至 1）就已经足够强大，盲目增大 <i>r</i> 不仅会增加参数量，有时甚至会导致性能下降。例如，对于 W<sub>q</sub> 和 W<sub>v</sub> 的组合，即使秩 <i>r</i> 仅为 1 或 2，模型在各项任务上的表现也已具竞争力，甚至超过了 <i>r</i>=64 的情况。这证明了权重更新确实是低秩的。
 
