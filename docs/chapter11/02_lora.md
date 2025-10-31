@@ -19,7 +19,7 @@ $$ \Delta W = B \cdot A $$
 其中，$W_0 \in \mathbb{R}^{d \times k}$，低秩分解后的 $B \in \mathbb{R}^{d \times r}$，$A \in \mathbb{R}^{r \times k}$，而秩 $r \ll \min(d, k)$。
 
 <p align="center">
-  <img src="./images/12_2_1.png" width="50%" alt="LoRA 结构" />
+  <img src="./images/12_2_1.png" width="40%" alt="LoRA 结构" />
   <br />
   <em>图 12-7：LoRA 结构示意图</em>
 </p>
@@ -116,7 +116,7 @@ $$
 
 有了 SVD 这种分解结构，AdaLoRA 接下来要解决的问题是：**如何衡量每个“更新分量”的重要性？**
 
-它将每个奇异值和其对应的左右奇异向量组合成一个“**三元组**”（triplet） $\mathcal{G}_{k,i} = \{P_{k,* i}, \lambda_{k,i}, Q_{k,i *}\}$。在训练过程中，AdaLoRA 会为每个三元组计算一个重要性分数 $S_{k,i}$。这个分数是基于对三元组中每个参数 $w$ 的重要性 $s(w)$ 进行聚合得到的。
+它将每个奇异值和其对应的左右奇异向量组合成一个“**三元组**”（triplet） $\mathcal{G}_{k,i} = \{P_{k, * i}, \lambda_{k,i}, Q_{k,i *}\}$。在训练过程中，AdaLoRA 会为每个三元组计算一个重要性分数 $S_{k,i}$。这个分数是基于对三元组中每个参数 $w$ 的重要性 $s(w)$ 进行聚合得到的。
 
 参数 $w$ 的重要性 $s(w)$ 又由两部分相乘得到：平滑后的**参数敏感度 (Sensitivity)** $\bar{I}(w)$ 和**不确定性 (Uncertainty)** $\bar{U}(w)$。
 
