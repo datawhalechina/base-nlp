@@ -82,7 +82,7 @@ PEFT 的思想借鉴了计算机视觉领域的迁移学习（Transfer Learning�
 
 `Prefix Tuning` 虽然强大，但其复杂的训练过程和在每一层都添加参数的设计，在实践中不够便捷。同年，Google 提出了 `Prompt Tuning`，可以看作是 Prefix Tuning 的一个 **简化版**。[^4] 这种方法也被称为一种“软提示”。
 
-它的做法是：只在输入的 **Embedding 层** 添加可学习的虚拟 Token（称为 **Soft Prompt**），而不再干预 Transformer 的任何中间层。
+它的做法就是，只在输入的 **Embedding 层** 添加可学习的虚拟 Token（称为 **Soft Prompt**），而不再干预 Transformer 的任何中间层。
 
 <p align="center">
   <img src="./images/12_1_3.png" width="80%" alt="Model Tuning 与 Prompt Tuning 对比" />
