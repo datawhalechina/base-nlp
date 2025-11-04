@@ -19,7 +19,7 @@ $$ \Delta W = B \cdot A $$
 其中， $W_0 \in \mathbb{R}^{d \times k}$，低秩分解后的 $B \in \mathbb{R}^{d \times r}$， $A \in \mathbb{R}^{r \times k}$，而秩 $r \ll \min(d, k)$。
 
 <p align="center">
-  <img src="./images/12_2_1.svg" width="60%" alt="LoRA 结构" />
+  <img src="./images/12_2_1.svg" width="55%" alt="LoRA 结构" />
   <br />
   <em>图 12-7：LoRA 结构示意图</em>
 </p>
@@ -322,7 +322,7 @@ $$
 \mathbf{X}^{\text{Int8}} = \text{round}\left(\frac{127}{\text{absmax}(\mathbf{X}^{\text{FP32}})} \mathbf{X}^{\text{FP32}}\right) = \text{round}(c^{\text{FP32}} \cdot \mathbf{X}^{\text{FP32}})
 $$
 
-这个过程依赖于 `absmax` 缩放，即找到张量中的绝对值最大值来计算缩放系数，也就是 **量化常数** $c^{\text{FP32}}$。这种方法对离群值非常敏感，正是其主要局限性。反量化则是其逆过程：
+这个过程依赖于 `absmax` 缩放，即找到张量中的绝对值最大值来计算缩放系数，也就是 **量化常数** $c^{\text{FP32}}$。这种方法对离群值非常敏感，也是它的主要局限性。反量化则是其逆过程：
 
 $$
 \text{dequant}(c^{\text{FP32}}, \mathbf{X}^{\text{Int8}}) = \frac{\mathbf{X}^{\text{Int8}}}{c^{\text{FP32}}} \approx \mathbf{X}^{\text{FP32}}
@@ -335,7 +335,7 @@ $$
 **分位数量化旨在让每个量化“桶”中，都包含相同数量的来自目标分布的值**。这意味着，在数据密集的区域（如正态分布的中心），量化点会更密集；在数据稀疏的区域（如分布的两尾），量化点会更稀疏。NF4 的具体构建步骤如下：
 1.  **确定理论分布**：首先，构建一个理论上的标准正态分布 $N(0, 1)$。
 2.  **计算分位数**：为这个标准正态分布精确计算出 $2^4 = 16$ 个值，这些值能将该分布的累积密度函数（CDF）划分为 16 个等概率的区间。这些计算出的分位数点，就构成了 NF4 数据类型能够表示的所有数值。
-3.  **归一化与量化**：在对实际的模型权重（通常以 block 为单位处理）进行量化时，首先通过“绝对值最大缩放”（absmax rescaling）进行归一化。具体来说，就是找到当前权重块中的绝对值最大值，并计算出其缩放因子，这个因子就是该块的**量化常数**（Quantization Constant），它通常是一个 32-bit 浮点数。将块内所有权重都乘以这个缩放因子，就可以将它们的数值范围归一化到 $[-1, 1]$ 区间。最后，将每一个归一化后的权重值，映射到离它最近的 NF4 分位数点上。
+3.  **归一化与量化**：在对实际的模型权重（通常以 block 为单位处理）进行量化时，首先通过“绝对值最大缩放”（absmax rescaling）进行归一化。具体来说，就是找到当前权重块中的绝对值最大值，并计算出其缩放因子，这个因子就是该块的 **量化常数**，它通常是一个 32-bit 浮点数。将块内所有权重都乘以这个缩放因子，就可以将它们的数值范围归一化到 $[-1, 1]$ 区间。最后，将每一个归一化后的权重值，映射到离它最近的 NF4 分位数点上。
 
 更精确地说，一个 k-bit 的 NormalFloat 数据类型（NFk）包含 $2^k$ 个量化点（$q_i$），其数值是通过以下公式估算的：
 
@@ -369,7 +369,6 @@ $$
 \mathbf{Y}^{\text{BF16}} = \mathbf{X}^{\text{BF16}}\text{doubleDequant}(c_1^{\text{FP32}}, c_2^{\text{k-bit}}, \mathbf{W}^{\text{NF4}}) + \mathbf{X}^{\text{BF16}}\mathbf{L}_1^{\text{BF16}}\mathbf{L}_2^{\text{BF16}}
 $$
 
-公式的右侧清晰地体现了这一流程：
 - **第一部分（主路）**：`doubleDequant` 函数对应了步骤 2 中的核心操作，它将 4-bit 的权重 $\mathbf{W}^{\text{NF4}}$ 动态恢复为 16-bit，再与 16-bit 的输入 $\mathbf{X}^{\text{BF16}}$ 相乘。
 - **第二部分（旁路）**： $\mathbf{X}^{\text{BF16}}\mathbf{L}_1^{\text{BF16}}\mathbf{L}_2^{\text{BF16}}$ 则是标准的 LoRA 模块，其计算全程保持 16-bit 精度。
 
