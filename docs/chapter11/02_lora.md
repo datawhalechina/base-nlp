@@ -19,7 +19,7 @@ $$ \Delta W = B \cdot A $$
 其中， $W_0 \in \mathbb{R}^{d \times k}$，低秩分解后的 $B \in \mathbb{R}^{d \times r}$， $A \in \mathbb{R}^{r \times k}$，而秩 $r \ll \min(d, k)$。
 
 <p align="center">
-  <img src="./images/12_2_1.svg" width="40%" alt="LoRA 结构" />
+  <img src="./images/12_2_1.svg" width="60%" alt="LoRA 结构" />
   <br />
   <em>图 12-7：LoRA 结构示意图</em>
 </p>
