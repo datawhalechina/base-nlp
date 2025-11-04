@@ -19,7 +19,7 @@ $$ \Delta W = B \cdot A $$
 其中， $W_0 \in \mathbb{R}^{d \times k}$，低秩分解后的 $B \in \mathbb{R}^{d \times r}$， $A \in \mathbb{R}^{r \times k}$，而秩 $r \ll \min(d, k)$。
 
 <p align="center">
-  <img src="./images/12_2_1.png" width="40%" alt="LoRA 结构" />
+  <img src="./images/12_2_1.svg" width="40%" alt="LoRA 结构" />
   <br />
   <em>图 12-7：LoRA 结构示意图</em>
 </p>
@@ -371,7 +371,7 @@ $$
 
 公式的右侧清晰地体现了这一流程：
 - **第一部分（主路）**：`doubleDequant` 函数对应了步骤 2 中的核心操作，它将 4-bit 的权重 $\mathbf{W}^{\text{NF4}}$ 动态恢复为 16-bit，再与 16-bit 的输入 $\mathbf{X}^{\text{BF16}}$ 相乘。
-- **第二部分（旁路）**：$\mathbf{X}^{\text{BF16}}\mathbf{L}_1^{\text{BF16}}\mathbf{L}_2^{\text{BF16}}$ 则是标准的 LoRA 模块，其计算全程保持 16-bit 精度。
+- **第二部分（旁路）**： $\mathbf{X}^{\text{BF16}}\mathbf{L}_1^{\text{BF16}}\mathbf{L}_2^{\text{BF16}}$ 则是标准的 LoRA 模块，其计算全程保持 16-bit 精度。
 
 ## 五、小结
 
