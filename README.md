@@ -78,7 +78,7 @@
 - **第1章：参数高效微调**
     - [x] [PEFT 技术综述](./docs/chapter11/01_PEFT.md)
     - [x] [LoRA 方法详解](./docs/chapter11/02_lora.md)
-    - [ ] [QLORA]()
+    - [x] [Hugging Face PEFT 实战](./docs/chapter11/03_huggingface_peft.md)
 - **第2章：高级微调技术**
     - [ ] [RLHF 技术详解](./docs/chapter11/01_rlhf.md)
     - [ ] [基于 Llama Factory 的微调实战](./docs/chapter11/02_llama_factory.md)
