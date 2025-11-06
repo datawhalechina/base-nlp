@@ -24,19 +24,19 @@
 
 -   **`get_peft_model` 函数**：扮演着“临阵变身”的角色。它接收基础的“悟空”（`base_model`）和选定的“法术搭配方案”（`peft_config`），然后依据方案，将对应的神通（例如 LoRA 的低秩矩阵）“加持”在悟空身上，从而打造出一个针对特定妖王特化的、能力更强的 `PeftModel`。
 
-通过这种方式，无需改动庞大的基础模型本身（冻结其大部分权重），只需定义、训练和切换不同的轻量级插件（Adapter），就能让模型高效地适应各种下游任务。这不仅节省了大量的计算和存储资源，也使得模型的管理和部署变得极为灵活。
+通过这种方式，无需改动庞大的基础模型本身（冻结其大部分权重），只需定义、训练和切换不同的轻量级插件（Adapter），就能让模型高效地适应各种下游任务。这不仅节省了大量的计算和存储资源，也使得模型的管理和部署变得更加灵活。
 
-## 二、`peft` 库的核心抽象
+## 二、`peft` 库的核心组件
 
-`peft` 库通过几个核心的类和函数，实现了对各种 PEFT 方法的统一封装，使其遵循一致的调用逻辑。
+`peft` 库通过几个核心的类和函数，实现了对各种 PEFT 方法的统一封装，使其遵循一致的调用逻辑。接下来，简单介绍一下。
 
-### 2.1 `PeftConfig`：PEFT 方法的“声明式配置”
+### 2.1 声明式配置 PeftConfig
 
 `PeftConfig` 是所有 PEFT 方法配置的基类，它采用声明式的方式定义了微调的策略。其中最重要的两个通用参数是：
 
 -   `peft_type`：一个枚举类型，用于 **指定要使用的 PEFT 插件类型**。例如，`PeftType.LORA` 明确表示使用 LoRA 方法。这是 `peft` 库能够自动检索和应用不同微调算法的关键。
 
--   `task_type`：一个枚举类型，用于 **指定模型的下游任务类型**。例如，`TaskType.CAUSAL_LM` 用于自回归语言模型（如 GPT），`TaskType.SEQ_2_SEQ_LM` 用于序列到序列模型（如 T5）。这个参数能够帮助 `peft` 库为特定任务对模型的头部（Head）或其他结构进行正确的适配。
+-   `task_type`：同样是枚举类型，用于 **指定模型的下游任务类型**。例如，`TaskType.CAUSAL_LM` 用于自回归语言模型（如 GPT），`TaskType.SEQ_2_SEQ_LM` 用于序列到序列模型（如 T5）。这个参数能够帮助 `peft` 库为特定任务对模型的头部（Head）或其他结构进行正确的适配。
 
 针对每一种具体的 PEFT 方法，`peft` 库都提供了一个继承自 `PeftConfig` 的子类，例如 `LoraConfig`、`PromptTuningConfig` 等。以 `LoraConfig` 为例，它包含了 LoRA 方法专属的超参数，这些参数直接源于 LoRA 论文中的定义：
 
@@ -44,18 +44,13 @@
 
 -   `lora_alpha`：LoRA 的**缩放因子**。在 LoRA 的计算中，低秩矩阵的输出 `BAx` 会乘以一个缩放系数 `alpha/r`。`lora_alpha` 就是这个公式中的 `alpha`，它用于调整低秩适应矩阵与原始权重矩阵合并时的尺度。
 
--   `target_modules`：一个字符串或正则表达式列表，用于**精确指定要将 LoRA 应用于基础模型中的哪些模块**。例如，`["q_proj", "v_proj"]` 表示仅在 Transformer 层的 `query` 和 `value` 投影矩阵上应用 LoRA。
+-   `target_modules`：一个字符串或正则表达式列表，用于 **精确指定要将 LoRA 应用于基础模型中的哪些模块**。如，`["q_proj", "v_proj"]` 表示仅在 Transformer 层的 `query` 和 `value` 投影矩阵上应用 LoRA。
 
 -   `lora_dropout`：在 LoRA 层上应用的 Dropout 比例，用于防止过拟合。
 
 -   `bias`：偏置（bias）参数的训练方式，可选值为 `'none'`（冻结所有 bias）、`'all'`（训练所有 bias）或 `'lora_only'`（仅训练 LoRA 模块自身的 bias）。
 
-在本次的文本生成实战中，正是通过这两个关键参数来告知 `peft` 库我们的意图：
--   `peft_type=PeftType.LORA`：明确我们选择 LoRA 作为本次微调的“插件”。
-
--   `task_type=TaskType.CAUSAL_LM`：指明我们的目标任务是因果语言模型（即文本生成），`peft` 库会据此对模型的结构进行正确的适配，例如确保只有语言模型头部的参数参与计算损失。
-
-### 2.2 `PeftModel` 与 `get_peft_model`：模型动态注入与封装
+### 2.2 动态注入生成 PeftModel
 
 `get_peft_model` 是 `peft` 库中的核心工厂函数。它接收一个原始的预训练模型和一个 `PeftConfig` 对象，然后执行以下操作：
 
@@ -66,7 +61,7 @@
 
 返回的 `peft_model` 对象是一个高度封装的模型。它内部保留了对原始基础模型的引用，并通过动态修改其 `forward` 传递路径，实现了 LoRA 逻辑的注入。这个 `peft_model` 实例拥有与基础模型完全兼容的接口，可以直接用于 `Trainer` 或自定义的训练循环中。
 
-一个非常有用的调试方法是 `peft_model.print_trainable_parameters()`，它可以精确计算并打印出模型中可训练参数的数量及其占总参数量的比例，可以直观地感受到 PEFT 在节约资源上的巨大优势。
+一个非常有用的调试方法是 `peft_model.print_trainable_parameters()`，它可以计算并打印出模型中可训练参数的数量及其占总参数量的比例，可以直观地感受到 PEFT 在节约资源上的巨大优势。
 
 ## 三、LoRA 微调实战流程
 
@@ -160,13 +155,13 @@ model = prepare_model_for_kbit_training(model)
 
 ### 3.3 定义 LoRA 配置并创建 `PeftModel`
 
-这是整个 PEFT 流程中最核心的一步。此步骤将实例化一个 `LoraConfig` 对象，用于声明式地定义 LoRA 微调的策略，然后使用 `get_peft_model` 函数将其应用到预处理过的基础模型上，从而得到一个 `PeftModel`。
+这是整个 PEFT 流程中最核心的一步。我们将应用刚才介绍的核心组件，实例化一个 `LoraConfig` 对象来声明 LoRA 微调的具体策略，然后使用 `get_peft_model` 函数将其应用到预处理过的基础模型上。
 
 在 `LoraConfig` 中，会详细设置 LoRA 的各个超参数，这些参数的选择直接关系到微调的效果和效率，与在 `02_lora.md` 中讨论的理论紧密相关：
 
 -   `r`：LoRA 的秩（rank）。这是最关键的超参数之一。`r` 越大，意味着低秩矩阵的表达能力越强，可训练的参数也越多。但正如 `02_lora.md` 的实验所示，`r` 并非越大越好，过大的 `r` 可能会增加噪声，且会线性增加可训练参数量。通常建议从 8 或 16 开始尝试。
 
--   `lora_alpha`：LoRA 的缩放因子。在 `02_lora.md` 中提到，最终的权重更新量会以 `alpha/r` 的比例进行缩放。这意味着，`lora_alpha` 的值可以理解为对学习到的低秩矩阵的“增强系数”。一个常见的做法是将其设置为 `r` 的两倍。
+-   `lora_alpha`：LoRA 的缩放因子。在前文中提到过，最终的权重更新量会以 `alpha/r` 的比例进行缩放。这意味着，`lora_alpha` 的值可以理解为对学习到的低秩矩阵的“增强系数”。一个常见的做法是将其设置为 `r` 的两倍。
 
 -   `target_modules`：指定要将 LoRA 应用于模型中的哪些模块。这是一个非常关键的参数，因为不同模型的模块命名方式不同。
     > **如何确定 `target_modules`？** 可以先打印出基础模型 `model` 的结构，并以其显示的层命名为准。对于大多数 Transformer 模型，注意力机制中的“查询（Query）”、“键（Key）”和“值（Value）”层（如 `q_proj`, `k_proj`, `v_proj`）是首选。而对于 `Pythia` 或 `GPT-NeoX` 系列模型，其注意力权重常被合并在一个 `query_key_value` 层中，前馈网络（FFN）中的线性层则常见 `dense`、`dense_h_to_4h` 和 `dense_4h_to_h`。将 LoRA 应用于这些层通常都能带来收益。
