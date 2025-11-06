@@ -1,6 +1,6 @@
 # 第三节 Hugging Face PEFT 实战
 
-在前两个小节中，深入探讨了参数高效微调（PEFT）的理论背景和主流方法，特别是 LoRA 的核心原理。理论知识为我们指明了方向，但要真正驾驭这些技术，需要一个强大而易用的工具。本节将进入实战环节，学习使用当前社区常用的 PEFT 工具库——Hugging Face 的 `peft`。[^1]
+在前两个小节中，探讨了参数高效微调（PEFT）的理论背景和主流方法，特别是 LoRA 的核心原理。这些知识为我们提供了理论支撑，但要真正驾驭这些技术，还需要一个强大而易用的工具。本节将进入实战环节，学习使用当前社区常用的 PEFT 工具库——Hugging Face 的 `peft`。[^1]
 
 <p align="center">
   <img src="./images/12_3_1.png" width="90%" alt="Hugging Face PEFT 库官方文档首页" />
@@ -14,15 +14,15 @@
 
 要理解 `peft` 库，首先要明白它并非要取代基础的模型库（例如 `transformers`），而是作为其 **插件** 或 **增强模块** 而存在。
 
-我们可以通过游戏《黑神话：悟空》来理解：
+我们可以通过类比游戏《黑神话：悟空》来理解：
 
--   **基础预训练模型**：如同主角“天命人”（悟空），他本身已拥有强大的基础能力和标志性的金箍棒。但面对不同的妖王（下游任务），只靠基础能力会很吃力。让他“重新修炼”以获得全新能力（即全量微调）显然不现实。
+-   **基础预训练模型**：如同主角“天命人”（悟空），他本身已拥有强大的基础能力和标志性的金箍棒。但面对不同的 Boss（下游任务），只靠基础能力会很吃力。让他“重新修炼”以获得全新能力（即全量微调）显然不现实。
 
 -   **`peft` 库**：则相当于悟空掌握的“七十二变”法术神通库。这个库里包含了各种强大的法术（如 LoRA）、变身能力（如 Prefix Tuning）和法宝（如 Prompt Tuning）。
 
 -   **`PeftConfig`**：相当于一份为特定 Boss 战准备的“法术搭配方案”。这份方案详细规划了要启用哪一种核心神通（例如 `peft_type='LORA'`），以及该神通的具体参数（例如 LoRA 的 `r`、`lora_alpha`，可以理解为法术的威力和范围）。
 
--   **`get_peft_model` 函数**：扮演着“临阵变身”的角色。它接收基础的“悟空”（`base_model`）和选定的“法术搭配方案”（`peft_config`），然后依据方案，将对应的神通（例如 LoRA 的低秩矩阵）“加持”在悟空身上，从而打造出一个针对特定妖王特化的、能力更强的 `PeftModel`。
+-   **`get_peft_model` 函数**：扮演着“临阵变身”的角色。它接收基础的“悟空”（`base_model`）和选定的“法术搭配方案”（`peft_config`），然后依据方案，将对应的神通（例如 LoRA 的低秩矩阵）“加持”在悟空身上，从而打造出一个针对特定 Boss 特化的、能力更强的 `PeftModel`。
 
 通过这种方式，无需改动庞大的基础模型本身（冻结其大部分权重），只需定义、训练和切换不同的轻量级插件（Adapter），就能让模型高效地适应各种下游任务。这不仅节省了大量的计算和存储资源，也使得模型的管理和部署变得更加灵活。
 
@@ -48,7 +48,7 @@
 
 -   `lora_dropout`：在 LoRA 层上应用的 Dropout 比例，用于防止过拟合。
 
--   `bias`：偏置（bias）参数的训练方式，可选值为 `'none'`（冻结所有 bias）、`'all'`（训练所有 bias）或 `'lora_only'`（仅训练 LoRA 模块自身的 bias）。
+-   `bias`：偏置参数的训练方式，可选值为 `'none'`（冻结所有 bias）、`'all'`（训练所有 bias）或 `'lora_only'`（仅训练 LoRA 模块自身的 bias）。
 
 ### 2.2 动态注入生成 PeftModel
 
@@ -61,19 +61,19 @@
 
 返回的 `peft_model` 对象是一个高度封装的模型。它内部保留了对原始基础模型的引用，并通过动态修改其 `forward` 传递路径，实现了 LoRA 逻辑的注入。这个 `peft_model` 实例拥有与基础模型完全兼容的接口，可以直接用于 `Trainer` 或自定义的训练循环中。
 
-一个非常有用的调试方法是 `peft_model.print_trainable_parameters()`，它可以计算并打印出模型中可训练参数的数量及其占总参数量的比例，可以直观地感受到 PEFT 在节约资源上的巨大优势。
+`peft_model` 还提供了一个有用的调试方法是 `print_trainable_parameters()`，它可以计算并打印出模型中可训练参数的数量及其占总参数量的比例，能够直观地感受到 PEFT 在节约资源上的巨大优势。
 
 ## 三、LoRA 微调实战流程
 
-结合 `peft` 库，可以形成一个标准的 LoRA 微调流程。下面将以微调 `EleutherAI/pythia-2.8b-deduped` 模型为例，展示一个与配套代码仓库中 `code/C11/peft_lora_pythia-2.8b.ipynb` Notebook 完全一致的实战 Pipeline。
+结合 `peft` 库，可以形成一个标准的 LoRA 微调流程。下面以 `EleutherAI/pythia-2.8b-deduped` 模型为例，进行微调实战。
+
+> [本节完整代码](https://github.com/datawhalechina/base-nlp/blob/main/code/C11/peft_pythia-2.8b.ipynb)
 
 ### 3.1 加载依赖、基础模型与分词器
 
-首先，加载所需的库和预训练模型。为了在消费级硬件上运行数十亿参数的大模型，关键在于采用**量化**技术。这里，将使用 `bitsandbytes` 库，在加载模型时直接对其进行 8-bit 量化，并指定 `dtype=torch.float16` 以进一步优化显存。
+为了在消费级硬件上运行数十亿参数的大模型，需要采用 **量化** 技术。这里，我们使用 `bitsandbytes` 库，在加载模型时直接对其进行 8-bit 量化，并指定 `dtype=torch.float16` 以进一步优化显存。
 
-根据 `transformers` 库的最新实践，现已不再推荐使用已被弃用的 `load_in_8bit=True` 参数，而是通过定义一个 `BitsAndBytesConfig` 对象，并将其传递给 `quantization_config` 参数来精确地控制量化行为。这种方式更灵活，也是未来的标准做法。
-
-同时，通过设置 `device_map="auto"`，可以让 `accelerate` 库自动地、智能地将模型层分配到可用的硬件上（例如，将所有层都放到唯一的 GPU 上）。
+根据 `transformers` 库的最新实践，现已不再推荐使用已被弃用的 `load_in_8bit=True` 参数，而是通过定义一个 `BitsAndBytesConfig` 对象，并将其传递给 `quantization_config` 参数来精确地控制量化行为。同时，通过设置 `device_map="auto"`，可以让 `accelerate` 库自动地、智能地将模型层分配到可用的硬件上（例如，将所有层都放到唯一的 GPU 上）。
 
 ```python
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
@@ -95,7 +95,7 @@ model = AutoModelForCausalLM.from_pretrained(
 )
 ```
 
-执行完这段代码后，如果打印 `model` 对象，你会看到模型架构的详细信息。其中，类似 `(query_key_value): Linear8bitLt(in_features=2560, out_features=7680, bias=True)` 的层表明，原始的 `nn.Linear` 已经被成功替换为 8-bit 量化版本 `Linear8bitLt`，这意味着模型加载和量化已成功完成。
+执行完这段代码后，如果打印 `model` 对象，你会看到模型架构的详细信息。其中，类似 `(query_key_value): Linear8bitLt(in_features=2560, out_features=7680, bias=True)` 的层表明，原始的 `nn.Linear` 已经被成功替换为 8-bit 量化版本 `Linear8bitLt`，说明模型加载和量化已成功完成。
 
 ```bash
 GPTNeoXForCausalLM(
@@ -126,7 +126,7 @@ GPTNeoXForCausalLM(
 )
 ```
 
-模型加载完成后，加载其对应的分词器。对于 Pythia 这类模型，其分词器默认可能没有 `pad_token`。在进行批量训练时，数据整理器（Data Collator）需要 `pad_token` 来将序列填充至相同长度，因此需要手动将其设置为 `eos_token`。
+模型加载完成后，加载其对应的分词器。对于 Pythia 这类模型，其分词器默认可能没有 `pad_token`。在进行批量训练时，数据整理器（Data Collator）要用 `pad_token` 将序列填充至相同长度，我们需要手动将其设置为 `eos_token`。
 
 ```python
 tokenizer = AutoTokenizer.from_pretrained(model_id)
@@ -138,7 +138,7 @@ tokenizer.pad_token = tokenizer.eos_token
 
 在使用 `peft` 对 8-bit 量化模型进行微调之前，需要进行一些必要的预处理。`peft` 库提供了一个非常方便的函数 `prepare_model_for_kbit_training` 来完成这项工作。
 
-> **注意**：在 PEFT 0.10.0 及更高版本中，原来的 `prepare_model_for_int8_training` 已被 `prepare_model_for_kbit_training` 替代，新函数同时支持 4-bit 和 8-bit 量化。
+> 在 PEFT 0.10.0 及更高版本中，原来的 `prepare_model_for_int8_training` 已被 `prepare_model_for_kbit_training` 替代，新函数同时支持 4-bit 和 8-bit 量化。
 
 这个函数主要执行几个关键操作：
 1.  **类型转换**：将模型中一些需要以更高精度（如 FP32）计算的层（例如 LayerNorm）进行类型转换，以保证训练的数值稳定性。
@@ -157,18 +157,18 @@ model = prepare_model_for_kbit_training(model)
 
 这是整个 PEFT 流程中最核心的一步。我们将应用刚才介绍的核心组件，实例化一个 `LoraConfig` 对象来声明 LoRA 微调的具体策略，然后使用 `get_peft_model` 函数将其应用到预处理过的基础模型上。
 
-在 `LoraConfig` 中，会详细设置 LoRA 的各个超参数，这些参数的选择直接关系到微调的效果和效率，与在 `02_lora.md` 中讨论的理论紧密相关：
+在 `LoraConfig` 中，会详细设置 LoRA 的各个超参数，这些参数的选择直接关系到微调的效果和效率，与在上节 `LoRA 方法详解` 中讨论的理论紧密相关：
 
--   `r`：LoRA 的秩（rank）。这是最关键的超参数之一。`r` 越大，意味着低秩矩阵的表达能力越强，可训练的参数也越多。但正如 `02_lora.md` 的实验所示，`r` 并非越大越好，过大的 `r` 可能会增加噪声，且会线性增加可训练参数量。通常建议从 8 或 16 开始尝试。
+-   `r`：LoRA 的秩。这是最关键的超参数之一。`r` 越大，意味着低秩矩阵的表达能力越强，可训练的参数也越多。但正如前文的实验所示，`r` 并非越大越好，过大的 `r` 可能会增加噪声，且会线性增加可训练参数量。通常建议从 8 或 16 开始尝试。
 
--   `lora_alpha`：LoRA 的缩放因子。在前文中提到过，最终的权重更新量会以 `alpha/r` 的比例进行缩放。这意味着，`lora_alpha` 的值可以理解为对学习到的低秩矩阵的“增强系数”。一个常见的做法是将其设置为 `r` 的两倍。
+-   `lora_alpha`：LoRA 的缩放因子。在前文提到过，最终的权重更新量会以 `alpha/r` 的比例进行缩放。这意味着，`lora_alpha` 的值可以理解为对学习到的低秩矩阵的“增强系数”。一个常见的做法是将其设置为 `r` 的两倍。
 
 -   `target_modules`：指定要将 LoRA 应用于模型中的哪些模块。这是一个非常关键的参数，因为不同模型的模块命名方式不同。
     > **如何确定 `target_modules`？** 可以先打印出基础模型 `model` 的结构，并以其显示的层命名为准。对于大多数 Transformer 模型，注意力机制中的“查询（Query）”、“键（Key）”和“值（Value）”层（如 `q_proj`, `k_proj`, `v_proj`）是首选。而对于 `Pythia` 或 `GPT-NeoX` 系列模型，其注意力权重常被合并在一个 `query_key_value` 层中，前馈网络（FFN）中的线性层则常见 `dense`、`dense_h_to_4h` 和 `dense_4h_to_h`。将 LoRA 应用于这些层通常都能带来收益。
 
 -   `bias`：偏置参数的训练方式。`'none'` 是最常用的设置，意味着不训练任何偏置参数，这与 LoRA 的原始思想保持一致，以最大化参数效率。在数据量充足的情况下，可以尝试 `'lora_only'`，仅训练 LoRA 模块自身的偏置。
 
-`LoraConfig` 的其他参数（如 `lora_dropout`、`task_type`）也都提供了对微调过程的精细控制。
+`LoraConfig` 的其他参数（如 `lora_dropout`、`task_type`）也都提供了对微调过程的精细控制，具体代码如下。
 
 ```python
 from peft import LoraConfig, get_peft_model
@@ -186,15 +186,18 @@ config = LoraConfig(
 # 应用配置，获得 PEFT 模型
 peft_model = get_peft_model(model, config)
 peft_model.print_trainable_parameters()
-# trainable params: 7,864,320 || all params: 2,783,073,280 || trainable%: 0.2826
 ```
-可以看到，可训练参数仅占总参数量的 0.28%，极大地降低了微调的硬件门槛。
+
+输出如下：
+```bash
+trainable params: 7,864,320 || all params: 2,783,073,280 || trainable%: 0.2826
+```
+
+通过前面提到的 `print_trainable_parameters()` 可以看到，可训练参数仅占总参数量的 0.28%。
 
 ### 3.4 数据处理
 
-现在模型已经准备就绪，需要为它准备“教材”——也就是训练数据。
-
-本次微调的目标是让模型学会生成名人名言。这里将使用 `Abirate/english_quotes` 这个数据集，它包含了大量的英文名言。
+现在模型已经准备就绪，需要为它准备“教材”——也就是训练数据。本次微调的目标是让模型学会生成名人名言。这里将使用 `Abirate/english_quotes` 这个数据集，它包含了大量的英文名言。
 
 数据处理流程如下：
 1.  **加载数据集**：使用 `datasets` 库从 Hugging Face Hub 下载数据集。
@@ -222,7 +225,9 @@ quotes_dataset['train'][0]
   'misattributed-oscar-wilde',
   'quote-investigator']}
 ```
+
 接下来，定义分词函数并将其应用到整个数据集上。
+
 ```python
 # 定义分词函数
 def tokenize_quotes(batch):
@@ -232,10 +237,11 @@ def tokenize_quotes(batch):
 # 对整个数据集进行分词处理
 tokenized_quotes = quotes_dataset.map(tokenize_quotes, batched=True)
 
-# 查看处理后的数据结构，会发现多了 "input_ids" 和 "attention_mask" 两列
 tokenized_quotes['train'][0]
 ```
+
 处理后的数据集新增了模型所需的 `input_ids` 和 `attention_mask` 列。
+
 ```
 {'quote': '“Be yourself; everyone else is already taken.”',
  'author': 'Oscar Wilde',
@@ -256,10 +262,10 @@ tokenized_quotes['train'][0]
 在 `TrainingArguments` 中，会设置一些关键的训练参数：
 
 -   `per_device_train_batch_size` & `gradient_accumulation_steps`：这两个参数共同决定了有效批量大小（effective batch size）。`per_device_train_batch_size` 是指每个 GPU 单次前向传播处理的样本数，而 `gradient_accumulation_steps` 则指定了梯度累积的步数。有效批量大小 = `per_device_train_batch_size` * `gradient_accumulation_steps` * `num_gpus`。通过梯度累积，可以在显存有限的情况下，模拟出更大的批量大小，这通常有助于稳定训练过程。
--   `warmup_steps`: 学习率预热的步数。在训练初期，学习率会从一个很小的值线性增加到设定的 `learning_rate`，这有助于模型在开始阶段更好地适应数据。
+-   `warmup_steps`: 学习率预热的步数。在训练初期，学习率会从一个很小的值线性增加到设定的 `learning_rate`，这能让模型在开始阶段更好地适应数据。
 -   `max_steps`: 训练的总步数。为了快速演示，这里只训练 200 步。
 -   `learning_rate`: 学习率，控制模型参数更新的幅度。
--   `fp16`: 启用 16-bit 混合精度训练。这可以在不牺牲太多性能的情况下，进一步减少显存占用并加速训练。
+-   `fp16`: 启用 16-bit 混合精度训练。可以在不牺牲太多性能的情况下，进一步减少显存占用并加速训练。
 
 最关键的是，将之前创建的 `PeftModel` 实例直接传递给 `Trainer`。`Trainer` 会足够智能，自动识别出只有 LoRA 相关的参数是可训练的，并在训练时冻结所有其他参数。
 
@@ -267,7 +273,7 @@ tokenized_quotes['train'][0]
 
 - **`max_steps` vs `num_train_epochs`**：`TrainingArguments` 允许通过设置 `max_steps`（总训练步数）或 `num_train_epochs`（总训练轮数）来控制训练的总长度。在快速原型验证或演示时，使用 `max_steps` 可以精确控制训练量，便于快速看到结果。在正式的项目中，使用 `num_train_epochs` 更为常见，它能确保模型完整地学习过所有训练数据指定的轮数。
 
-- **验证集的缺失**：在专业的训练流程中，通常会从数据集中划分出一部分作为验证集（validation set），并在 `TrainingArguments` 中通过 `evaluation_strategy` 参数设置评估时机（例如，每 N 步或每个 epoch 结束后），以便监控模型是否过拟合，并据此进行早停（Early Stopping）等操作。为了简化演示流程，本教程省略了这一环节。
+- **验证集的缺失**：在专业的训练流程中，通常会从数据集中划分出一部分作为验证集，并在 `TrainingArguments` 中通过 `evaluation_strategy` 参数设置评估时机（例如，每 N 步或每个 epoch 结束后），以便监控模型是否过拟合，并据此进行早停等操作。为了简化演示流程，本教程省略了这一环节。
 
 ```python
 from transformers import Trainer, TrainingArguments, DataCollatorForLanguageModeling
@@ -301,36 +307,31 @@ trainer = Trainer(
 # 开始训练
 trainer.train()
 ```
+
 执行 `trainer.train()` 后，控制台会实时打印训练日志。训练完成后，`train` 方法会返回一个包含所有训练指标的 `TrainOutput` 对象，方便进行分析和记录。
-```
-TrainOutput(global_step=200, training_loss=2.308660719394684, metrics={'train_runtime': 517.6098, 'train_samples_per_second': 6.182, 'train_steps_per_second': 0.386, 'total_flos': 4566109437050880.0, 'train_loss': 2.308660719394684, 'epoch': 1.2743221690590112})
-```
 
 ### 3.6 模型保存与推理
 
-训练完成后，可以将学到的知识——也就是轻量的 LoRA 适配器——保存下来，以备将来使用。
+训练完成后，可以将学到的知识——也就是轻量的 LoRA 适配器保存下来，以备后续使用。
 
 对 `PeftModel`（即 `peft_model`）调用 `save_pretrained()` 时，`peft` 会只保存增量的、可训练的适配器权重，而不是整个庞大的基础模型。通常，保存下来的文件（`adapter_model.safetensors` 和 `adapter_config.json`）只有几十 MB。
 
 > **合并权重**
 >
-> 正如前文中所讨论的，LoRA 的一个核心优势是它不会在推理时引入额外的延迟。这是因为它训练出的旁路矩阵 $A$ 和 $B$ 可以被 **合并（merge）** 回原始的权重矩阵中。训练完成后，可以调用 `merged_model = peft_model.merge_and_unload()` 方法，它会返回一个标准的 `transformers` 模型，其权重已经包含了 LoRA 的更新。这个 `merged_model` 的结构与原始模型完全一致，因此可以像任何普通模型一样进行部署，而没有任何额外的计算开销。
+> 正如上节中所讨论的，LoRA 的一个核心优势是它不会在推理时引入额外的延迟。这是因为它训练出的旁路矩阵 $A$ 和 $B$ 可以被 **合并（merge）** 回原始的权重矩阵中。训练完成后，可以调用 `merged_model = peft_model.merge_and_unload()` 方法，它会返回一个标准的 `transformers` 模型，其权重已经包含了 LoRA 的更新。这个 `merged_model` 的结构与原始模型完全一致，所以可以像任何普通模型一样进行部署，而没有任何额外的计算开销。
 > 若基础模型以 8/4-bit 量化加载，合并后返回的标准模型通常会转为 FP16/FP32；若需继续以 k-bit 部署，可在合并后按需重新量化。
 
-为了验证微调的效果，可以进行一次推理测试，观察模型在续写名言开头的表现。
+为了验证微调的效果，可以进行一次推理测试，观察模型在续写名言开头的表现。为了获得最佳的推理效果并避免警告，需要注意以下几点：
 
-### 推理配置要点
-
-为了获得最佳的推理效果并避免警告，需要注意以下几点：
 1. **传递 attention_mask**：显式传递 `attention_mask`，确保模型能够正确识别有效的 token。
 2. **启用采样**：设置 `do_sample=True` 以启用温度采样和核采样参数。
 3. **启用 use_cache**：推理前将 `use_cache=True` 可提升生成效率；训练阶段通常配合梯度检查点将其关闭。
 
-### 生成参数说明
+**生成参数说明：**
 -   `max_length`: 生成文本的最大长度（包括输入）。
 -   `do_sample`: 是否使用采样策略。设置为 `True` 时，`temperature`、`top_p`、`top_k` 才会生效。
--   `temperature`: 控制生成的随机性。较低的值（如 0.7）会使生成更具确定性，而较高的值则会增加多样性。
--   `top_p`: 核采样（nucleus sampling）的概率阈值。只考虑累积概率达到 `top_p` 的最小 token 集合。
+-   `temperature`: 控制生成的随机性。较低的值（如 0.6）会使生成更具确定性，而较高的值则会增加多样性。
+-   `top_p`: 核采样的概率阈值。只考虑累积概率达到 `top_p` 的最小 token 集合。
 -   `top_k`: 每步只从概率最高的 `k` 个 token 中采样。
 -   `repetition_penalty`: 重复惩罚因子，大于 1.0 会降低重复内容的概率。
 
@@ -338,7 +339,7 @@ TrainOutput(global_step=200, training_loss=2.308660719394684, metrics={'train_ru
 # 将模型设置为评估模式
 peft_model.eval()
 
-# 设置 pad_token_id 到模型配置中（避免警告）
+# 设置 pad_token_id 到模型配置中
 peft_model.config.pad_token_id = tokenizer.pad_token_id
 
 prompt = "Be yourself; everyone"
@@ -378,15 +379,15 @@ decoded_output
 
 > **模型输出的非确定性**
 >
-> 大语言模型输出的非确定性主要来源于其解码阶段的 **采样策略**。当 `do_sample=True` 时，模型会根据计算出的词汇表概率分布进行随机抽样，而不是像确定性的贪心搜索那样总是选择概率最高的词。`temperature`、`top_p` 等参数正是用来调节这种抽样过程的随机程度的。
+> 大语言模型输出的非确定性主要来源于解码阶段的 **采样策略**。当 `do_sample=True` 时，模型会根据计算出的词汇表概率分布进行随机抽样，而不是像确定性的贪心搜索那样总是选择概率最高的词。`temperature`、`top_p` 等参数正是用来调节这种抽样过程的随机程度的。
 >
-> 所以，这些采样参数是引入输出多样性的**主要和意图性**的来源。除此之外，底层的CUDA算子、浮点数计算精度等因素也可能导致即使在固定随机种子的情况下，两次运行结果仍存在微小差异，但这并非主要原因。在本地运行时得到与文档不完全相同的结果，属于正常现象。
+> 所以，这些采样参数是引入输出多样性的 **主要和意图性** 的来源。除此之外，底层的CUDA算子、浮点数计算精度等因素也可能导致即使在固定随机种子的情况下，两次运行结果仍存在微小差异，但这并非主要原因。在本地运行时得到与文档不完全相同的结果，属于正常现象。
 
 ## 四、小结
 
-本节通过一个完整的端到端实例，亲手实践了如何利用 `peft` 库对一个数十亿参数的大语言模型进行 LoRA 参数高效微调。内容涵盖从加载量化模型、准备数据，到配置 LoRA、定义 `Trainer` 并进行训练，最终验证了微调的效果。
+本节通过一个完整的示例，实践了如何利用 `peft` 库对一个数十亿参数的大语言模型进行 LoRA 参数高效微调。内容涵盖从加载量化模型、准备数据，到配置 LoRA、定义 `Trainer` 并进行训练，最终验证了微调的效果。
 
-`peft` 库将复杂的 PEFT 技术封装在简洁、统一的接口背后，极大地降低了研究者和开发者使用这些前沿技术的门槛。通过 `PeftConfig` 和 `get_peft_model` 这两个核心抽象，可以轻松地将 LoRA 等方法应用到 `transformers` 生态的任意模型上，实现“四两拨千斤”的高效微调。随着 AdaLoRA、QLoRA 等更先进技术的集成，在资源有限的条件下驾驭大模型将变得越来越普及。
+`peft` 库将复杂的 PEFT 技术封装在简洁、统一的接口背后，大大降低了研究者和开发者使用这些前沿技术的门槛。通过 `PeftConfig` 和 `get_peft_model` 这两个组件，可以轻松地将 LoRA 等方法应用到 `transformers` 生态的任意模型上，实现“四两拨千斤”的高效微调。不过除了 AdaLoRA、QLoRA 等技术的集成， `peft` 库还适配了 P-Tuning、IA3 等技术，可以自行测试效果。
 
 ---
 
