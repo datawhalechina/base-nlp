@@ -1,6 +1,6 @@
 # 第三节 Hugging Face PEFT 实战
 
-在前两个小节中，深入探讨了参数高效微调（PEFT）的理论背景和主流方法，特别是 LoRA 的核心原理。理论知识为我们指明了方向，但要真正驾驭这些技术，需要一个强大而易用的工具。本节将正式进入实战环节，聚焦于当前社区最核心的 PEFT 工具库——Hugging Face 的 `peft`。[^1]
+在前两个小节中，深入探讨了参数高效微调（PEFT）的理论背景和主流方法，特别是 LoRA 的核心原理。理论知识为我们指明了方向，但要真正驾驭这些技术，需要一个强大而易用的工具。本节将进入实战环节，学习使用当前社区常用的 PEFT 工具库——Hugging Face 的 `peft`。[^1]
 
 <p align="center">
   <img src="./images/12_3_1.png" width="90%" alt="Hugging Face PEFT 库官方文档首页" />
@@ -8,17 +8,21 @@
   <em>图 12-11：Hugging Face PEFT 库官方文档首页</em>
 </p>
 
-`peft` 库的设计理念与 Hugging Face 生态系统一脉相承，都是希望将复杂的 PEFT 技术（如 LoRA, Prefix Tuning, Adapter 等）抽象成统一、简洁的接口，让开发者能够以最小的代码改动，将这些高效微调方法无缝地应用到 Hugging Face Hub 上的大模型上。如图 12-11，`peft` 库的官方文档将其内容划分为快速入门、方法指南、概念指南和参考手册，便于开发者上手。
+`peft` 库的设计理念与 Hugging Face 生态系统一脉相承，它希望将复杂的 PEFT 技术（如 LoRA, Prefix Tuning, Adapter 等）抽象成统一、简洁的接口，让开发者能够以最小的代码改动，将这些高效微调方法无缝地应用到 Hugging Face Hub 上的大模型上。如图 12-11，`peft` 库的官方文档将其内容划分为快速入门、方法指南、概念指南和参考手册，便于开发者上手。
 
 ## 一、`peft` 库的设计理念
 
-要理解 `peft` 库，首先要明白它并非要取代基础的模型库（例如 `transformers`），而是作为其 **插件** 或 **增强模块** 而存在。它巧妙地继承并扩展了 Hugging Face 的设计哲学，尤其是自动化配置的理念。
+要理解 `peft` 库，首先要明白它并非要取代基础的模型库（例如 `transformers`），而是作为其 **插件** 或 **增强模块** 而存在。
 
-可以从软件工程的角度来理解它们的关系：
--   **基础预训练模型**：可以看作一个功能强大但行为固定的 **框架**。它具备强大的通用能力，但要改变其内部逻辑以适应特定任务，通常需要修改其源码或进行完整的重新训练，成本高昂。
--   **`peft` 库**：则提供了一套 **插件接口** 和多种 **插件实现**（如 LoRA、Prompt Tuning 等）。这些插件可以在不侵入核心库代码的前提下，动态地改变或扩展其功能。
--   **`PeftConfig`**：相当于一个 **配置文件**。这份文件详细定义了要加载哪个插件（例如 `peft_type='LORA'`），以及这个插件的具体参数（例如 LoRA 的 `r`、`lora_alpha` 等超参数）。
--   **`get_peft_model` 函数**：扮演着一个 **插件管理器** 的角色。它接收核心库（`base_model`）和配置文件（`peft_config`），然后依据配置，将相应的插件模块（例如 LoRA 的低秩矩阵）动态地注入到核心库模型的指定位置，生成一个功能增强后的新对象 `PeftModel`。
+我们可以用《黑神话：悟空》来做一个生动的比喻：
+
+-   **基础预训练模型**：如同主角“天命人”（悟空），他本身已拥有强大的基础能力和标志性的金箍棒。但面对不同的妖王（下游任务），只靠基础能力会很吃力。让他“重新修炼”以获得全新能力（即全量微调）显然不现实。
+
+-   **`peft` 库**：则相当于悟空掌握的“七十二变”法术神通库。这个库里包含了各种强大的法术（如 LoRA）、变身能力（如 Prefix Tuning）和法宝（如 Prompt Tuning）。
+
+-   **`PeftConfig`**：相当于一份为特定 Boss 战准备的“法术搭配方案”。这份方案详细规划了要启用哪一种核心神通（例如 `peft_type='LORA'`），以及该神通的具体参数（例如 LoRA 的 `r`、`lora_alpha`，可以理解为法术的威力和范围）。
+
+-   **`get_peft_model` 函数**：扮演着“临阵变身”的角色。它接收基础的“悟空”（`base_model`）和选定的“法术搭配方案”（`peft_config`），然后依据方案，将对应的神通（例如 LoRA 的低秩矩阵）“加持”在悟空身上，从而打造出一个针对特定妖王特化的、能力更强的 `PeftModel`。
 
 通过这种方式，无需改动庞大的基础模型本身（冻结其大部分权重），只需定义、训练和切换不同的轻量级插件（Adapter），就能让模型高效地适应各种下游任务。这不仅节省了大量的计算和存储资源，也使得模型的管理和部署变得极为灵活。
 
@@ -31,23 +35,30 @@
 `PeftConfig` 是所有 PEFT 方法配置的基类，它采用声明式的方式定义了微调的策略。其中最重要的两个通用参数是：
 
 -   `peft_type`：一个枚举类型，用于 **指定要使用的 PEFT 插件类型**。例如，`PeftType.LORA` 明确表示使用 LoRA 方法。这是 `peft` 库能够自动检索和应用不同微调算法的关键。
+
 -   `task_type`：一个枚举类型，用于 **指定模型的下游任务类型**。例如，`TaskType.CAUSAL_LM` 用于自回归语言模型（如 GPT），`TaskType.SEQ_2_SEQ_LM` 用于序列到序列模型（如 T5）。这个参数能够帮助 `peft` 库为特定任务对模型的头部（Head）或其他结构进行正确的适配。
 
 针对每一种具体的 PEFT 方法，`peft` 库都提供了一个继承自 `PeftConfig` 的子类，例如 `LoraConfig`、`PromptTuningConfig` 等。以 `LoraConfig` 为例，它包含了 LoRA 方法专属的超参数，这些参数直接源于 LoRA 论文中的定义：
 
 -   `r`：LoRA 的**秩（rank）**，决定了低秩矩阵 A 和 B 的中间维度 `(d, r)` 和 `(r, k)`。它是控制新增参数量和模型适应能力的核心超参数。
+
 -   `lora_alpha`：LoRA 的**缩放因子**。在 LoRA 的计算中，低秩矩阵的输出 `BAx` 会乘以一个缩放系数 `alpha/r`。`lora_alpha` 就是这个公式中的 `alpha`，它用于调整低秩适应矩阵与原始权重矩阵合并时的尺度。
+
 -   `target_modules`：一个字符串或正则表达式列表，用于**精确指定要将 LoRA 应用于基础模型中的哪些模块**。例如，`["q_proj", "v_proj"]` 表示仅在 Transformer 层的 `query` 和 `value` 投影矩阵上应用 LoRA。
+
 -   `lora_dropout`：在 LoRA 层上应用的 Dropout 比例，用于防止过拟合。
+
 -   `bias`：偏置（bias）参数的训练方式，可选值为 `'none'`（冻结所有 bias）、`'all'`（训练所有 bias）或 `'lora_only'`（仅训练 LoRA 模块自身的 bias）。
 
 在本次的文本生成实战中，正是通过这两个关键参数来告知 `peft` 库我们的意图：
 -   `peft_type=PeftType.LORA`：明确我们选择 LoRA 作为本次微调的“插件”。
+
 -   `task_type=TaskType.CAUSAL_LM`：指明我们的目标任务是因果语言模型（即文本生成），`peft` 库会据此对模型的结构进行正确的适配，例如确保只有语言模型头部的参数参与计算损失。
 
 ### 2.2 `PeftModel` 与 `get_peft_model`：模型动态注入与封装
 
 `get_peft_model` 是 `peft` 库中的核心工厂函数。它接收一个原始的预训练模型和一个 `PeftConfig` 对象，然后执行以下操作：
+
 1.  解析 `PeftConfig`，确定要使用的 PEFT 方法和相关参数。
 2.  遍历基础模型的网络结构，根据 `target_modules` 找到需要注入 LoRA 模块的目标层。
 3.  将原始的目标层（如 `nn.Linear`）替换/封装为注入了 LoRA 的线性模块（如 LoraLinear 或其 k-bit 量化变体）。该模块内部保留冻结的原始权重，并引入可训练的低秩分支 A 和 B。
@@ -152,10 +163,14 @@ model = prepare_model_for_kbit_training(model)
 这是整个 PEFT 流程中最核心的一步。此步骤将实例化一个 `LoraConfig` 对象，用于声明式地定义 LoRA 微调的策略，然后使用 `get_peft_model` 函数将其应用到预处理过的基础模型上，从而得到一个 `PeftModel`。
 
 在 `LoraConfig` 中，会详细设置 LoRA 的各个超参数，这些参数的选择直接关系到微调的效果和效率，与在 `02_lora.md` 中讨论的理论紧密相关：
+
 -   `r`：LoRA 的秩（rank）。这是最关键的超参数之一。`r` 越大，意味着低秩矩阵的表达能力越强，可训练的参数也越多。但正如 `02_lora.md` 的实验所示，`r` 并非越大越好，过大的 `r` 可能会增加噪声，且会线性增加可训练参数量。通常建议从 8 或 16 开始尝试。
+
 -   `lora_alpha`：LoRA 的缩放因子。在 `02_lora.md` 中提到，最终的权重更新量会以 `alpha/r` 的比例进行缩放。这意味着，`lora_alpha` 的值可以理解为对学习到的低秩矩阵的“增强系数”。一个常见的做法是将其设置为 `r` 的两倍。
+
 -   `target_modules`：指定要将 LoRA 应用于模型中的哪些模块。这是一个非常关键的参数，因为不同模型的模块命名方式不同。
     > **如何确定 `target_modules`？** 可以先打印出基础模型 `model` 的结构，并以其显示的层命名为准。对于大多数 Transformer 模型，注意力机制中的“查询（Query）”、“键（Key）”和“值（Value）”层（如 `q_proj`, `k_proj`, `v_proj`）是首选。而对于 `Pythia` 或 `GPT-NeoX` 系列模型，其注意力权重常被合并在一个 `query_key_value` 层中，前馈网络（FFN）中的线性层则常见 `dense`、`dense_h_to_4h` 和 `dense_4h_to_h`。将 LoRA 应用于这些层通常都能带来收益。
+
 -   `bias`：偏置参数的训练方式。`'none'` 是最常用的设置，意味着不训练任何偏置参数，这与 LoRA 的原始思想保持一致，以最大化参数效率。在数据量充足的情况下，可以尝试 `'lora_only'`，仅训练 LoRA 模块自身的偏置。
 
 `LoraConfig` 的其他参数（如 `lora_dropout`、`task_type`）也都提供了对微调过程的精细控制。
@@ -244,6 +259,7 @@ tokenized_quotes['train'][0]
 `Trainer` 是 `transformers` 库提供的一个高度抽象化的训练器，它封装了标准的 PyTorch 训练循环。只需通过 `TrainingArguments` 定义训练的“策略”，而无需手动编写繁琐的训练代码（如梯度更新、学习率调度、日志记录等）。
 
 在 `TrainingArguments` 中，会设置一些关键的训练参数：
+
 -   `per_device_train_batch_size` & `gradient_accumulation_steps`：这两个参数共同决定了有效批量大小（effective batch size）。`per_device_train_batch_size` 是指每个 GPU 单次前向传播处理的样本数，而 `gradient_accumulation_steps` 则指定了梯度累积的步数。有效批量大小 = `per_device_train_batch_size` * `gradient_accumulation_steps` * `num_gpus`。通过梯度累积，可以在显存有限的情况下，模拟出更大的批量大小，这通常有助于稳定训练过程。
 -   `warmup_steps`: 学习率预热的步数。在训练初期，学习率会从一个很小的值线性增加到设定的 `learning_rate`，这有助于模型在开始阶段更好地适应数据。
 -   `max_steps`: 训练的总步数。为了快速演示，这里只训练 200 步。
@@ -253,7 +269,9 @@ tokenized_quotes['train'][0]
 最关键的是，将之前创建的 `PeftModel` 实例直接传递给 `Trainer`。`Trainer` 会足够智能，自动识别出只有 LoRA 相关的参数是可训练的，并在训练时冻结所有其他参数。
 
 除了上述基础参数外，还有两个关于训练策略的要点值得注意：
+
 - **`max_steps` vs `num_train_epochs`**：`TrainingArguments` 允许通过设置 `max_steps`（总训练步数）或 `num_train_epochs`（总训练轮数）来控制训练的总长度。在快速原型验证或演示时，使用 `max_steps` 可以精确控制训练量，便于快速看到结果。在正式的项目中，使用 `num_train_epochs` 更为常见，它能确保模型完整地学习过所有训练数据指定的轮数。
+
 - **验证集的缺失**：在专业的训练流程中，通常会从数据集中划分出一部分作为验证集（validation set），并在 `TrainingArguments` 中通过 `evaluation_strategy` 参数设置评估时机（例如，每 N 步或每个 epoch 结束后），以便监控模型是否过拟合，并据此进行早停（Early Stopping）等操作。为了简化演示流程，本教程省略了这一环节。
 
 ```python
