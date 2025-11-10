@@ -78,7 +78,7 @@ You are a helpful assistant.<|im_end|>
 
 在投入资源微调前，必须先摸清基础模型的底细，确认微调的必要性。这里选择游戏《黑神话：悟空》进行效果测试。
 
-> [评估完整代码]()
+> [评估完整代码](https://github.com/datawhalechina/base-nlp/blob/main/code/C11/04_qwen2.5_test.ipynb)
 
 #### 3.1.1 加载量化模型与分词器
 
@@ -234,7 +234,7 @@ print(f"问题: {question_2}\n回答:\n{answer_2}")
 
 评估完成后，我们正式进入数据集构建阶段。我们将利用一个更强大的“教师”模型，将非结构化的游戏介绍文档，自动化地加工成结构化的指令微调数据集。
 
-> [数据构建完整代码]()
+> [数据构建完整代码](https://github.com/datawhalechina/base-nlp/blob/main/code/C11/04_dataset_gen.ipynb)
 
 #### 3.2.1 初始化与配置
 
@@ -391,7 +391,7 @@ print(f"saved: {written} -> {OUT_JSONL}")
 
 拥有数据集后，就进入了最后的模型微调与评估阶段。我们将使用上一节生成的 `wukong_dataset_*.jsonl` 文件，对 `Qwen/Qwen2.5-7B-Instruct` 模型进行 QLoRA 微调。
 
-[QLoRA 微调完整代码]()
+[QLoRA 微调完整代码](https://github.com/datawhalechina/base-nlp/blob/main/code/C11/04_qwen2.5_qlora.ipynb)
 
 ### 4.1 QLoRA 微调
 
