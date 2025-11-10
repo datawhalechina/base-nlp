@@ -16,7 +16,7 @@ Llama2 遵循了 GPT 系列开创的 **Decoder-Only** 架构。这意味着它�
   <em>图 6-1：Llama2 架构示意图</em>
 </p>
 
-如图 6-1 所示，Llama2 的核心由 N 个相同的 Transformer Block 堆叠而成。每个 Block 内部的数据流展示了 Llama2 的设计：
+如图 6-1 所示，Llama2 的核心由 N 个相同的 Transformer Block 堆叠而成。Block 内部的数据流展示了 Llama2 的设计：
 
 - **预归一化 (Pre-Normalization)**：与经典 Transformer 的后归一化不同，输入在进入注意力层和前馈网络**之前**，都会先经过一次 `RMS Norm`。这被认为是提升大模型训练稳定性的关键。
 - **组件升级**：支持 `Grouped-Query Attention (GQA)`（如 Llama2-70B 采用[^1]；小模型可视为 `n_kv_heads == n_heads` 的 MHA 特例），前馈网络采用 `SwiGLU`，归一化使用 `RMSNorm`。

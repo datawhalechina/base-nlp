@@ -67,7 +67,7 @@
 
 结合 `peft` 库，可以形成一个标准的 LoRA 微调流程。下面以 `EleutherAI/pythia-2.8b-deduped` 模型为例，进行微调实战。
 
-> [本节完整代码](https://github.com/datawhalechina/base-nlp/blob/main/code/C11/peft_pythia-2.8b.ipynb)
+> [本节完整代码](https://github.com/datawhalechina/base-nlp/blob/main/code/C11/03_peft_pythia-2.8b.ipynb)
 
 ### 3.1 加载依赖、基础模型与分词器
 
