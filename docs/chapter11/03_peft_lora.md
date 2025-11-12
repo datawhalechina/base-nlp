@@ -3,7 +3,7 @@
 在前两个小节中，探讨了参数高效微调（PEFT）的理论背景和主流方法，特别是 LoRA 的核心原理。这些知识为我们提供了理论支撑，但要真正驾驭这些技术，还需要一个强大而易用的工具。本节将进入实战环节，学习使用当前社区常用的 PEFT 工具库——Hugging Face 的 `peft`。[^1]
 
 <p align="center">
-  <img src="./images/12_3_1.png" width="90%" alt="Hugging Face PEFT 库官方文档首页" />
+  <img src="./images/11_3_1.png" width="90%" alt="Hugging Face PEFT 库官方文档首页" />
   <br />
   <em>图 12-11：Hugging Face PEFT 库官方文档首页</em>
 </p>

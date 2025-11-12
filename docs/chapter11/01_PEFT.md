@@ -37,7 +37,7 @@ PEFT 的思想借鉴了计算机视觉领域的迁移学习（Transfer Learning�
 `Adapter Tuning` 是 PEFT 领域的开创性工作之一，由 Google 在 2019 年为 BERT 模型设计。[^2] 其思路是在 Transformer 的每个块中 **插入** 小型的“适配器”（Adapter）模块。
 
 <p align="center">
-  <img src="./images/12_1_1.png" width="60%" alt="Adapter Tuning 结构" />
+  <img src="./images/11_1_1.png" width="60%" alt="Adapter Tuning 结构" />
   <br />
   <em>图 12-1：Adapter Tuning 结构</em>
 </p>
@@ -57,7 +57,7 @@ PEFT 的思想借鉴了计算机视觉领域的迁移学习（Transfer Learning�
 2021 年，斯坦福大学的研究者提出了 `Prefix Tuning`，为 PEFT 开辟了一条全新的思路。[^3] 与 Adapter 在模型内部“动手术”不同，Prefix Tuning 选择 **在模型外部做文章**，就像是给模型带上了一张“小抄”。
 
 <p align="center">
-  <img src="./images/12_1_2.png" width="80%" alt="Prefix Tuning 注解示例" />
+  <img src="./images/11_1_2.png" width="80%" alt="Prefix Tuning 注解示例" />
   <br />
   <em>图 12-2：Prefix Tuning 注解示例</em>
 </p>
@@ -85,7 +85,7 @@ PEFT 的思想借鉴了计算机视觉领域的迁移学习（Transfer Learning�
 它的做法就是，只在输入的 **Embedding 层** 添加可学习的虚拟 Token（称为 **Soft Prompt**），而不再干预 Transformer 的任何中间层。
 
 <p align="center">
-  <img src="./images/12_1_3.png" width="80%" alt="Model Tuning 与 Prompt Tuning 对比" />
+  <img src="./images/11_1_3.png" width="80%" alt="Model Tuning 与 Prompt Tuning 对比" />
   <br />
   <em>图 12-3：Model Tuning 与 Prompt Tuning 对比</em>
 </p>
@@ -108,7 +108,7 @@ PEFT 的思想借鉴了计算机视觉领域的迁移学习（Transfer Learning�
 此外，这篇论文最重要的发现是**模型规模的缩放效应（The Power of Scale）**。
 
 <p align="center">
-  <img src="./images/12_1_4.png" width="60%" alt="Prompt Tuning 性能与模型规模的关系" />
+  <img src="./images/11_1_4.png" width="60%" alt="Prompt Tuning 性能与模型规模的关系" />
   <br />
   <em>图 12-4：Prompt Tuning 性能与模型规模的关系</em>
 </p>
@@ -128,7 +128,7 @@ Prompt Tuning 虽然足够高效，但它的稳定性较差，且严重依赖超
 为了理解 P-Tuning v2 的精髓，我们首先需要了解其前身 P-Tuning v1。v1 的主要目标是解决 **离散提示（Discrete Prompts）** 的“不稳定性”问题。[^5]
 
 <p align="center">
-   <img src="./images/12_1_5.png" width="80%" alt="离散提示搜索与 P-Tuning 对比" />
+   <img src="./images/11_1_5.png" width="80%" alt="离散提示搜索与 P-Tuning 对比" />
    <br />
    <em>图 12-5：离散提示搜索与 P-Tuning 对比</em>
 </p>
@@ -149,7 +149,7 @@ Prompt Tuning 虽然足够高效，但它的稳定性较差，且严重依赖超
 2021 年底问世的 P-Tuning v2，正是为了解决 v1 的局限性而设计的。[^6] 它博采众长，吸收了 Prefix Tuning 的思想，最终成为一种在不同模型规模、不同任务上都表现出色的通用 PEFT 方案。
 
 <p align="center">
-   <img src="./images/12_1_6.png" width="80%" alt="P-Tuning v1 与 P-Tuning v2 的结构对比" />
+   <img src="./images/11_1_6.png" width="80%" alt="P-Tuning v1 与 P-Tuning v2 的结构对比" />
    <br />
    <em>图 12-6：P-Tuning v1 与 P-Tuning v2 的结构对比</em>
 </p>

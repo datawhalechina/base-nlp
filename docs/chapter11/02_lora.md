@@ -19,7 +19,7 @@ $$ \Delta W = B \cdot A $$
 其中， $W_0 \in \mathbb{R}^{d \times k}$，低秩分解后的 $B \in \mathbb{R}^{d \times r}$， $A \in \mathbb{R}^{r \times k}$，而秩 $r \ll \min(d, k)$。
 
 <p align="center">
-  <img src="./images/12_2_1.svg" width="55%" alt="LoRA 结构" />
+  <img src="./images/11_2_1.svg" width="55%" alt="LoRA 结构" />
   <br />
   <em>图 12-7：LoRA 结构示意图</em>
 </p>
@@ -196,7 +196,7 @@ LoRA 的作者们为了简化问题和提高参数效率，将研究范围 **限
 实验表明，为所有矩阵和所有层级设置一个统一的、固定的秩 $r$，远非最优解。不同任务、不同模型层、不同权重矩阵，其“可塑性”和对任务的重要性是不同的，它们理应被区别对待。手动去探索这个巨大的超参组合空间几乎是不可能的。
 
 <p align="center">
-  <img src="./images/12_2_2.png" width="70%" alt="AdaLoRA 动机" />
+  <img src="./images/11_2_2.png" width="70%" alt="AdaLoRA 动机" />
   <br />
   <em>图 12-8：不同模块与层级的微调性能对比</em>
 </p>
@@ -278,7 +278,7 @@ $$
 这种“先探索、后收敛”的策略，让模型有更充分的机会去发现哪些权重真正重要，从而做出更优的预算分配决策。最终，AdaLoRA 实现了在训练过程中对秩的**动态调整**和在不同模块间的**智能分配**。
 
 <p align="center">
-  <img src="./images/12_2_3.png" width="90%" alt="AdaLoRA 结果" />
+  <img src="./images/11_2_3.png" width="90%" alt="AdaLoRA 结果" />
   <br />
   <em>图 12-9：AdaLoRA 最终秩分配结果示意图</em>
 </p>
@@ -303,7 +303,7 @@ LoRA 和 AdaLoRA 分别从“低秩近似”和“自适应秩分配”两个角
 华盛顿大学的研究者们提出了 **QLoRA (Quantized LoRA)**，一种更高阶的参数高效微调方法。[^3] 它通过一系列压缩技术，实现了很不错的效果。在保持与 16-bit 全量微调相当性能的同时，**成功将一个 65B（650 亿）参数模型的微调任务，压缩到了一块 48GB 显存的 GPU 上**。
 
 <p align="center">
-  <img src="./images/12_2_4.png" width="80%" alt="QLoRA 与其他方法对比" />
+  <img src="./images/11_2_4.png" width="80%" alt="QLoRA 与其他方法对比" />
   <br />
   <em>图 12-10：全量微调、LoRA 与 QLoRA 的机制对比</em>
 </p>

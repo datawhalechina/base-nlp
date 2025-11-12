@@ -63,7 +63,7 @@
     - [x] [GPT 架构及应用](./docs/chapter5/14_GPT.md)
 - **第6章：深入大模型架构**
     - [x] [手搓一个大模型](./docs/chapter6/16_handcraft_llama2.md)
-    - [] [MOE 架构解析]
+    - [ ] [MOE 架构解析]
 
 ### 第二部分：实战篇
 - **第1章：文本分类**
@@ -81,7 +81,7 @@
     - [x] [基于 peft 库的 LoRA 实战](./docs/chapter11/03_peft_lora.md)
     - [x] [Qwen2.5 微调私有数据](./docs/chapter11/04_qwen2.5_qlora.md)
 - **第2章：高级微调技术**
-    - [ ] [RLHF 技术详解](./docs/chapter12/01_rlhf.md)
+    - [x] [RLHF 技术详解](./docs/chapter12/01_rlhf.md)
     - [ ] [基于 Llama Factory 的微调实战](./docs/chapter12/02_llama_factory.md)
 - **第3章：大模型训练与量化**
     - [ ] [Deepspeed 框架介绍](./docs/chapter12/01_deepspeed.md)
