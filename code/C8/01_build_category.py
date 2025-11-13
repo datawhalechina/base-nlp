@@ -4,7 +4,7 @@ import os
 
 def save_json(data, file_path):
     """
-    将数据以格式化的 JSON 形式保存到文件。
+    将数据以格式化的 JSON 形式保存到文件
     """
     os.makedirs(os.path.dirname(file_path), exist_ok=True)
     with open(file_path, 'w', encoding='utf-8') as f:
@@ -13,7 +13,7 @@ def save_json(data, file_path):
 
 def collect_entity_types_from_file(file_path):
     """
-    从单个数据文件中提取所有唯一的实体类型。
+    从单个数据文件中提取所有唯一的实体类型
     """
     types = set()
     with open(file_path, 'r', encoding='utf-8') as f:
@@ -27,7 +27,7 @@ def collect_entity_types_from_file(file_path):
 
 def generate_tag_map(data_files, output_file):
     """
-    从数据文件构建 BMES 标签映射并保存。
+    从数据文件构建 BMES 标签映射并保存
     """
     # 1. 从所有文件中收集实体类型
     all_entity_types = set()

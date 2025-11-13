@@ -5,7 +5,7 @@ from collections import Counter
 
 def save_json(data, file_path):
     """
-    将数据以易于阅读的格式保存为 JSON 文件。
+    将数据以易于阅读的格式保存为 JSON 文件
     """
     os.makedirs(os.path.dirname(file_path), exist_ok=True)
     with open(file_path, 'w', encoding='utf-8') as f:
@@ -14,7 +14,7 @@ def save_json(data, file_path):
 
 def normalize_text(text):
     """
-    规范化文本，例如将全角字符转换为半角字符。
+    规范化文本
     """
     full_width = "０１２３４５６７８９ＡＢＣＤＥＦＧＨＩＪＫＬＭＮＯＰＱＲＳＴＵＶＷＸＹＺａｂｃｄｅｆｇｈｉｊｋｌｍｎｏｐｑｒｓｔｕｖｗｘｙｚ！＃＄％＆’（）＊＋，－．／：；＜＝＞？＠［＼］＾＿｀｛｜｝～＂"
     half_width = r"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!#$%&'" + r'()*+,-./:;<=>?@[\]^_`{|}~".'
@@ -24,7 +24,7 @@ def normalize_text(text):
 
 def create_char_vocab(data_files, output_file, min_freq=1):
     """
-    从数据文件创建字符级词汇表。
+    从数据文件创建字符级词汇表
     """
     char_counts = Counter()
     for file_path in data_files:
