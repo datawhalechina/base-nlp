@@ -4,6 +4,7 @@
 
 <div align="center">
   <h2>从 NLP 到大语言模型</h2>
+  <p><em>Base NLP is all you need</em></p>
 </div>
 
 <div align="center">
