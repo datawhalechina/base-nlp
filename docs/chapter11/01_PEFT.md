@@ -39,10 +39,10 @@ PEFT 的思想借鉴了计算机视觉领域的迁移学习（Transfer Learning�
 <p align="center">
   <img src="./images/11_1_1.png" width="60%" alt="Adapter Tuning 结构" />
   <br />
-  <em>图 12-1：Adapter Tuning 结构</em>
+  <em>图 11-1 Adapter Tuning 结构</em>
 </p>
 
-如图 12-1 所示，左侧的 Transformer 层展示了 Adapter 模块是如何被集成进去的：它被插入到每个子层（注意力层和前馈网络）的内部，并与主干网络形成残差连接。在训练时，只有 Adapter 模块的参数会被更新。
+如图 11-1 所示，左侧的 Transformer 层展示了 Adapter 模块是如何被集成进去的：它被插入到每个子层（注意力层和前馈网络）的内部，并与主干网络形成残差连接。在训练时，只有 Adapter 模块的参数会被更新。
 
 图的右侧展示了 Adapter 模块自身的结构：
 1.  一个“降维”的全连接层（Feedforward down-project），将高维特征映射到低维空间。
@@ -59,10 +59,10 @@ PEFT 的思想借鉴了计算机视觉领域的迁移学习（Transfer Learning�
 <p align="center">
   <img src="./images/11_1_2.png" width="80%" alt="Prefix Tuning 注解示例" />
   <br />
-  <em>图 12-2：Prefix Tuning 注解示例</em>
+  <em>图 11-2 Prefix Tuning 注解示例</em>
 </p>
 
-图 12-2 是一个注解示例，它揭示了 Prefix Tuning 的工作细节。该图分别展示了 Prefix Tuning 在自回归语言模型（上）和编码器-解码器模型（下）中的应用。其核心机制在于：
+图 11-2 是一个注解示例，它揭示了 Prefix Tuning 的工作细节。该图分别展示了 Prefix Tuning 在自回归语言模型（上）和编码器-解码器模型（下）中的应用。其核心机制在于：
 - **前缀激活值（Prefix Activations）**：图中 `PREFIX` 部分对应的激活值 $h_i$（其中 $i ∈ P_idx$）是从一个专门的可训练矩阵 $P_{\theta}$ 中提取的，这部分参数就是微调的对象。
 - **模型计算的激活值**: 而原始输入 $x$ 和输出 $y$ 对应的激活值，则是由 **冻结** 的 Transformer 模型正常计算得出的。
 
@@ -87,10 +87,10 @@ PEFT 的思想借鉴了计算机视觉领域的迁移学习（Transfer Learning�
 <p align="center">
   <img src="./images/11_1_3.png" width="80%" alt="Model Tuning 与 Prompt Tuning 对比" />
   <br />
-  <em>图 12-3：Model Tuning 与 Prompt Tuning 对比</em>
+  <em>图 11-3 Model Tuning 与 Prompt Tuning 对比</em>
 </p>
 
-图 12-3 直观地展示了 `Prompt Tuning` 这种简化思路在实践中所带来的巨大差异，它不仅是参数效率的提升，更在使用范式上迈出了新的一步。
+图 11-3 直观地展示了 `Prompt Tuning` 这种简化思路在实践中所带来的巨大差异，它不仅是参数效率的提升，更在使用范式上迈出了新的一步。
 
 -   **左侧：全量微调（Model Tuning）**
     -   作为性能基准，这种方法遵循“一个任务，一个模型”的模式。
@@ -110,10 +110,10 @@ PEFT 的思想借鉴了计算机视觉领域的迁移学习（Transfer Learning�
 <p align="center">
   <img src="./images/11_1_4.png" width="60%" alt="Prompt Tuning 性能与模型规模的关系" />
   <br />
-  <em>图 12-4：Prompt Tuning 性能与模型规模的关系</em>
+  <em>图 11-4 Prompt Tuning 性能与模型规模的关系</em>
 </p>
 
-如图 12-4 所示，实验表明：
+如图 11-4 所示，实验表明：
 - 当模型规模较小（如 1 亿参数）时，Prompt Tuning 的效果（绿线）远不如传统的模型微调（红线和橙线）。
 - **但当模型规模超过 100 亿时，Prompt Tuning 的性能开始追平甚至超越全量微调！**
 
@@ -130,10 +130,10 @@ Prompt Tuning 虽然足够高效，但它的稳定性较差，且严重依赖超
 <p align="center">
    <img src="./images/11_1_5.png" width="80%" alt="离散提示搜索与 P-Tuning 对比" />
    <br />
-   <em>图 12-5：离散提示搜索与 P-Tuning 对比</em>
+   <em>图 11-5 离散提示搜索与 P-Tuning 对比</em>
 </p>
 
-如图 12-5 所示，P-Tuning v1 将自己与传统的 **离散提示搜索** 方法进行了对比：
+如图 11-5 所示，P-Tuning v1 将自己与传统的 **离散提示搜索** 方法进行了对比：
 - **（a）离散提示搜索**：这类方法试图在离散的文本空间中找到最优的提示词组合（如 "The capital of Britain is [MASK]"）。这种搜索过程通常只能依赖离散的奖励信号，优化非常困难且不稳定，找到的解往往是次优的。
 - **（b）P-Tuning**：它提出，不应该在离散空间搜索，而应该在连续空间中进行优化。为此，P-Tuning v1 引入了一个关键组件：**Prompt Encoder**。它的逻辑是：
     1.  首先定义一组可学习的、连续的 **伪提示（Pseudo Prompts）**，例如 $[P_0], ..., [P_m]$。
@@ -151,10 +151,10 @@ Prompt Tuning 虽然足够高效，但它的稳定性较差，且严重依赖超
 <p align="center">
    <img src="./images/11_1_6.png" width="80%" alt="P-Tuning v1 与 P-Tuning v2 的结构对比" />
    <br />
-   <em>图 12-6：P-Tuning v1 与 P-Tuning v2 的结构对比</em>
+   <em>图 11-6 P-Tuning v1 与 P-Tuning v2 的结构对比</em>
 </p>
 
-如图 12-6 清晰地展示了 P-Tuning v2 的演进。
+如图 11-6 清晰地展示了 P-Tuning v2 的演进。
 - **（a）P-Tuning v1 & Prompt Tuning**: 这两种方法都属于“浅层提示”，即 **只在输入层**（Embedding Layer）添加可学习的提示向量 $h_i$。这种方式虽然高效，但可调参数有限，且对模型后续层的影响较为间接。而且，它们通常依赖于一个精心设计的 **Verbalizer**（模板映射器）来将任务输出转换为模型可理解的词汇，这在序列标注等复杂任务上难以适用。
 - **（b）P-Tuning v2**: 它进行了两项关键的结构性改进，使其变得更加强大和通用：
     1.  **引入深层提示（Deep Prompts）**：这是 P-Tuning v2 最核心的改进。它借鉴了 Prefix Tuning 的思想，**在 Transformer 的每一层都添加了可学习的提示**（Layer Prompts）。使得可微调的参数量（尽管仍在 0.1%~3%）和对模型行为的干预能力都 **显著增强**，尤其对于需要复杂推理的 NLU 任务至关重要。

@@ -62,7 +62,7 @@ INFO:     Application startup complete.
 <p align="center">
   <img src="./images/14_1_1.png" width="80%" alt="FastAPI 自动生成的交互式 API 文档" />
   <br />
-  <em>图 14-1：FastAPI 自动生成的交互式 API 文档</em>
+  <em>图 14-1 FastAPI 自动生成的交互式 API 文档</em>
 </p>
 
 如图 14-1，在这个页面中，可以查看所有的 API 端点（Endpoints）、参数和返回结构，并直接进行调用和测试。点击右上角的 “Try it out” 按钮，然后再点击蓝色的 “Execute” 按钮，页面下方会立即显示出 API 的执行结果。
@@ -70,7 +70,7 @@ INFO:     Application startup complete.
 <p align="center">
   <img src="./images/14_1_2.png" width="80%" alt="在 FastAPI 文档中执行 API" />
   <br />
-  <em>图 14-2：在 FastAPI 文档中执行 API</em>
+  <em>图 14-2 在 FastAPI 文档中执行 API</em>
 </p>
 
 如图 14-2，返回的结果中甚至包含了可以直接使用的 `curl` 命令、请求 URL、服务器响应内容和响应头。这种所见即所得的调试方式能够大大提高开发效率。
@@ -80,7 +80,7 @@ INFO:     Application startup complete.
 <p align="center">
   <img src="./images/14_1_3.png" width="80%" alt="由 ReDoc 生成的 API 文档" />
   <br />
-  <em>图 14-3：由 ReDoc 生成的 API 文档</em>
+  <em>图 14-3 由 ReDoc 生成的 API 文档</em>
 </p>
 
 如图 14-3 所示，ReDoc 提供了更加紧凑和文档化的视图，适合阅读和理解 API 的整体结构。在界面顶部可以看到有个 “Download” 按钮，能够直接下载 `openapi.json` 文件。这份文件非常有用，因为它可以被许多第三方工具使用，例如：

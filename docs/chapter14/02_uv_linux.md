@@ -25,7 +25,7 @@
 <p align="center">
   <img src="./images/14_2_1.png" width="80%" alt="阿里云 ECS 实例管理页面" />
   <br />
-  <em>图 14-4：阿里云 ECS 实例管理页面</em>
+  <em>图 14-4 阿里云 ECS 实例管理页面</em>
 </p>
 
 准备好服务器后，会获得一个公网 IP 地址，后续我们将通过这个 IP 进行远程操作。登录云服务商的控制台，进入 ECS 实例管理页面如图 14-4，先找到并复制服务器的**公网 IP 地址**，后续连接服务器会用到。
@@ -37,7 +37,7 @@
 <p align="center">
   <img src="./images/14_2_2.png" width="80%" alt="安全组列表页面" />
   <br />
-  <em>图 14-5：安全组列表页面</em>
+  <em>图 14-5 安全组列表页面</em>
 </p>
 
 2.  在安全组列表中，找到实例所绑定的安全组，点击右侧的“管理规则”。
@@ -47,7 +47,7 @@
 <p align="center">
   <img src="./images/14_2_3.png" width="80%" alt="新建安全组入方向规则" />
   <br />
-  <em>图 14-6：新建安全组入方向规则</em>
+  <em>图 14-6 新建安全组入方向规则</em>
 </p>
 
 4.  如图 14-6 所示，在弹出的“新建安全组规则”窗口中，进行如下配置：
@@ -79,7 +79,7 @@
 <p align="center">
   <img src="./images/14_2_4.png" width="80%" alt="FinalShell 官网下载页面" />
   <br />
-  <em>图 14-7：FinalShell 官网下载页面</em>
+  <em>图 14-7 FinalShell 官网下载页面</em>
 </p>
 
 下载后，按照常规软件的安装步骤进行安装即可。
@@ -91,7 +91,7 @@
 <p align="center">
   <img src="./images/14_2_5.png" width="80%" alt="FinalShell 连接管理器" />
   <br />
-  <em>图 14-8：FinalShell 连接管理器</em>
+  <em>图 14-8 FinalShell 连接管理器</em>
 </p>
 
 2.  在弹出的窗口中，如图 14-8 点击第一个带加号的图标（“新建连接”），选择“SSH连接(Linux)”。
@@ -99,7 +99,7 @@
 <p align="center">
   <img src="./images/14_2_6.png" width="80%" alt="FinalShell 新建 SSH 连接" />
   <br />
-  <em>图 14-9：FinalShell 新建 SSH 连接</em>
+  <em>图 14-9 FinalShell 新建 SSH 连接</em>
 </p>
 
 3.  如图 14-9 所示，在弹出的“新建 SSH 连接”窗口中，填写服务器的相关信息：
@@ -115,7 +115,7 @@
 <p align="center">
   <img src="./images/14_2_7.png" width="80%" alt="FinalShell 快速连接" />
   <br />
-  <em>图 14-10：FinalShell 快速连接</em>
+  <em>图 14-10 FinalShell 快速连接</em>
 </p>
 
 5.  如图 14-10，双击刚刚创建的连接，FinalShell 就会开始尝试连接你的云服务器。首次连接时，可能会弹出一个接受主机密钥的提示，点击“接受并保存”即可。
@@ -123,7 +123,7 @@
 <p align="center">
   <img src="./images/14_2_8.png" width="80%" alt="FinalShell 命令行界面" />
   <br />
-  <em>图 14-11：FinalShell 命令行界面</em>
+  <em>图 14-11 FinalShell 命令行界面</em>
 </p>
 
 连接成功后，如图 14-11 能看到一个 Linux 命令行界面，同时窗口左侧还会动态显示服务器的 CPU、内存和网络使用情况。至此，我们已经成功登录到了云服务器，可以开始配置环境了。
@@ -240,7 +240,7 @@ sudo apt update && sudo apt upgrade -y
     <p align="center">
        <img src="./images/14_2_9.png" width="80%" alt="FinalShell 文件上传" />
        <br />
-       <em>图 14-12：FinalShell 文件上传</em>
+       <em>图 14-12 FinalShell 文件上传</em>
     </p>
 
 2.  **创建并激活虚拟环境**
@@ -301,7 +301,7 @@ gunicorn -w 3 -k uvicorn.workers.UvicornWorker main:app --bind 0.0.0.0:8000
 <p align="center">
   <img src="./images/14_2_10.png" width="80%" alt="Gunicorn 启动日志" />
   <br />
-  <em>图 14-13：Gunicorn 启动日志</em>
+  <em>图 14-13 Gunicorn 启动日志</em>
 </p>
 
 如果看到如图 14-13 服务成功启动的日志，说明应用本身没有问题。按 `Ctrl+C` 停止它。
@@ -369,10 +369,10 @@ gunicorn -w 3 -k uvicorn.workers.UvicornWorker main:app --bind 0.0.0.0:8000
         <p align="center">
           <img src="./images/14_2_11.png" width="80%" alt="systemctl status 显示服务正在运行" />
           <br />
-          <em>图 14-11：systemctl status 显示服务正在运行</em>
+          <em>图 14-14 systemctl status 显示服务正在运行</em>
         </p>
 
-        如果看到如图 14-11 所示 `active (running)` 的绿色字样，说明服务已成功部署并正在后台运行！
+        如果看到如图 14-14 所示 `active (running)` 的绿色字样，说明服务已成功部署并正在后台运行！
 
 要查看服务的实时日志，可以使用 `journalctl` 命令：
 
@@ -393,7 +393,7 @@ curl -X POST "http://<服务器公网IP>:8000/predict/ner" -H "Content-Type: app
 <p align="center">
   <img src="./images/12_2_12.png" width="80%" alt="curl 测试云端服务" />
   <br />
-  <em>图 14-12：curl 测试云端服务</em>
+  <em>图 14-15 curl 测试云端服务</em>
 </p>
 
 如果一切顺利，会收到如图 14-12 和本地测试时一致的 JSON 响应，里面包含了模型识别出的实体。同时，也可以在浏览器中访问 `http://<服务器公-网IP>:8000/docs`，来查看并使用 FastAPI 自动生成的交互式 API 文档。
