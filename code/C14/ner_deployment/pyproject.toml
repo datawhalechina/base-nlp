@@ -1,0 +1,20 @@
+[project]
+name = "ner-deployment-service"
+version = "1.0.0"
+description = "NER model deployment with FastAPI and uv."
+dependencies = [
+    "fastapi",
+    "pydantic",
+    "uvicorn",
+    "gunicorn",
+    "numpy<2"
+    "torch==2.2.1",
+]
+
+[[tool.uv.index]]
+name = "aliyun"
+url = "https://mirrors.aliyun.com/pypi/simple/"
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"

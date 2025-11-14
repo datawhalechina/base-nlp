@@ -7,7 +7,6 @@ from src.tokenizer.vocabulary import Vocabulary
 from src.tokenizer.char_tokenizer import CharTokenizer
 from src.utils.file_io import load_json
 
-
 class NerPredictor:
     def __init__(self, model_dir, device='cpu'):
         self.device = torch.device(device)

@@ -1,6 +1,6 @@
-# 第一节 FastAPI - 现代化Python Web框架
+# 第一节 FastAPI 模型部署实战
 
-在部署机器学习模型时，常见的做法是将其封装成一个可以通过 HTTP 访问的 API 服务。在 Python 社区中有许多优秀的 Web 框架，都能帮助我们构建 API。本节我们以 **FastAPI** 为例，来对此前训练好的命名实体识别模型进行部署。
+在部署机器学习模型时，常见的做法是将其封装成一个可以通过 HTTP 访问的 API 服务。在 Python 社区中有许多优秀的 Web 框架，都能帮助我们构建 API。本节我们以 **[FastAPI](https://fastapi.tiangolo.com/zh/)** 为例，来对此前训练好的命名实体识别模型进行部署。
 
 FastAPI 是基于 Starlette 和 Pydantic 构建的。Starlette 赋予了它极高的性能，足以与 NodeJS 和 Go 等语言的框架相媲美；而 Pydantic 则使其能够利用 Python 的类型提示（Type Hints）实现自动的数据校验和转换，极大地减少了烦琐的参数验证代码。除此之外，FastAPI 还有一个“杀手级”特性。它能够根据代码自动生成交互式的 API 文档（基于 OpenAPI 和 Swagger UI），方便开发者直接在页面上进行调试。同时，它还充分利用了 `async/await` 等现代 Python 特性，为开发者带来了既健壮又高效的现代化开发体验。
 
@@ -51,7 +51,7 @@ INFO:     Waiting for application startup.
 INFO:     Application startup complete.
 ```
 
-现在，打开浏览器访问 `http://127.0.0.1:8000`，你将看到返回的 JSON 结果： `{"Hello":"World"}`。
+现在，打开浏览器访问 `http://127.0.0.1:8000`，将看到返回的 JSON 结果： `{"Hello":"World"}`。
 
 ### 2.2 自动交互式 API 文档
 
@@ -133,7 +133,7 @@ def predict(request: PredictRequest):
 
 #### 2.3.2 查询参数
 
-如果你的 API 需要通过 URL 查询字符串（如 `?key=value`）来接收参数，只需在路径操作函数中以普通函数参数的形式声明即可。
+如果我们的 API 需要通过 URL 查询字符串（如 `?key=value`）来接收参数，只需在路径操作函数中以普通函数参数的形式声明即可。
 
 ```python
 # 示例: http://127.0.0.1:8000/search/?query=你好
@@ -399,6 +399,8 @@ async def root():
     curl -X POST "http://127.0.0.1:8000/predict/ner" -H "Content-Type: application/json" -d "{\"text\":\"患者自述发热、咳嗽，伴有轻微头痛。\"}"
     ```
 
+    > 在 Windows PowerShell 中，`curl` 是 `Invoke-WebRequest` 命令的别名，它的参数格式与标准 `curl` 不同，直接运行以上命令会报错。推荐在 `cmd` 中执行此命令。
+
     应该会收到类似下面的 JSON 响应（格式化后）：
 
     ```json
@@ -435,6 +437,6 @@ async def root():
 
 ## 四、小结
 
-本节我们学习了如何使用 FastAPI 这一现代化 Python Web 框架来部署机器学习模型。从一个简单的 "Hello World" 应用入手，体验了它的核心优势——基于 Pydantic 的自动数据校验和基于 OpenAPI 规范的交互式文档。随后，我们构建了一个包含日志、异常处理和规范化返回的 API 模板，并最终将其应用于命名实体识别模型中。
+本节我们学习了如何使用 FastAPI 这一框架来部署模型。从一个简单的 "Hello World" 应用入手，体验了它的核心优势——基于 Pydantic 的自动数据校验和基于 OpenAPI 规范的交互式文档。随后，我们构建了一个包含日志、异常处理和规范化返回的 API 模板，并最终将其应用于命名实体识别模型中。
 
 掌握了本节介绍的基础知识后，还可以进一步探索 FastAPI 更强大的功能来应对更复杂的应用场景。例如，使用**依赖注入**系统来管理共享的逻辑和数据库连接；通过**路由器**将大型应用拆分为多个模块化的文件，以保持代码的清晰和可维护性；利用**后台任务**在返回响应后执行耗时操作，避免阻塞客户端；以及 FastAPI 与 Pytest 的**测试**框架，为我们的 API 编写健壮的单元测试和集成测试。
