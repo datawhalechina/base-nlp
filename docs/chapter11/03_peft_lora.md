@@ -5,10 +5,10 @@
 <p align="center">
   <img src="./images/11_3_1.png" width="90%" alt="Hugging Face PEFT 库官方文档首页" />
   <br />
-  <em>图 12-11：Hugging Face PEFT 库官方文档首页</em>
+  <em>图 11-11 Hugging Face PEFT 库官方文档首页</em>
 </p>
 
-`peft` 库的设计理念与 Hugging Face 生态系统一脉相承，它希望将复杂的 PEFT 技术（如 LoRA, Prefix Tuning, Adapter 等）抽象成统一、简洁的接口，让开发者能够以最小的代码改动，将这些高效微调方法无缝地应用到 Hugging Face Hub 上的大模型上。如图 12-11，`peft` 库的官方文档将其内容划分为快速入门、方法指南、概念指南和参考手册，便于开发者上手。
+`peft` 库的设计理念与 Hugging Face 生态系统一脉相承，它希望将复杂的 PEFT 技术（如 LoRA, Prefix Tuning, Adapter 等）抽象成统一、简洁的接口，让开发者能够以最小的代码改动，将这些高效微调方法无缝地应用到 Hugging Face Hub 上的大模型上。如图 11-11，`peft` 库的官方文档将其内容划分为快速入门、方法指南、概念指南和参考手册，便于开发者上手。
 
 ## 一、`peft` 库的设计理念
 
