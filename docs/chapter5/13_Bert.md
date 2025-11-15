@@ -345,6 +345,7 @@ BertModel(
 ## 练习
 
 - 总结 BERT 和 Transformer(Encoder) 区别
+- 尝试将之前实现的文本分类模型，从基于 `Word2Vec` 和 `LSTM` 的结构，迁移为使用 `BERT` 模型进行微调。对比分析两者在模型构建、训练流程以及最终性能上的异同。
 
 ---
 

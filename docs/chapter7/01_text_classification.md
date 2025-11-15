@@ -37,7 +37,7 @@ graph LR
 
 ## 三、新闻文本分类代码实践
 
-> [本节完整代码](https://github.com/datawhalechina/base-nlp/blob/main/code/C7/01_text_classification.ipynb)（[py版](https://github.com/datawhalechina/base-nlp/blob/main/code/C7/01_text_classification.py)）
+> [本节完整代码](https://github.com/datawhalechina/base-nlp/blob/main/code/C7/01_text_classification.ipynb)
 
 本节将使用 `scikit-learn` 库中的 `20 Newsgroups` 数据集，这是一个包含约20000篇新闻文档、近似均衡分布在20个不同新闻组（类别）的集合。
 
@@ -64,6 +64,18 @@ from sklearn.datasets import fetch_20newsgroups
 categories = ['alt.atheism', 'soc.religion.christian', 'comp.graphics', 'sci.med']
 train_dataset_raw = fetch_20newsgroups(subset='train', categories=categories, shuffle=True, random_state=42)
 test_dataset_raw = fetch_20newsgroups(subset='test', categories=categories, shuffle=True, random_state=42)
+
+sample = {
+    "text_preview": train_dataset_raw.data[0][:200],
+    "label": train_dataset_raw.target_names[train_dataset_raw.target[0]],
+}
+sample
+```
+
+输出：
+```bash
+{'text_preview': 'From: sd345@city.ac.uk (Michael Collier)\nSubject: Converting images to HP LaserJet III?\nNntp-Posting-Host: hampton\nOrganization: The City University\nLines: 14\n\nDoes anyone know of a good way (standard',
+ 'label': 'comp.graphics'}
 ```
 
 #### 3.2.2 数据探索与可视化
@@ -77,7 +89,7 @@ import matplotlib.pyplot as plt
 import re
 
 # 为了进行探索，先定义一个简单的分词函数
-def _tokenize_text(text):
+def basic_tokenize(text):
     text = text.lower()
     text = re.sub(r"[^a-z0-9(),.!?\\'`]", " ", text)
     text = re.sub(r"([,.!?\\'`])", r" \\1 ", text)
@@ -85,7 +97,7 @@ def _tokenize_text(text):
     return tokens
 
 # 计算每篇文档的词元数量
-train_text_lengths = [len(_tokenize_text(text)) for text in train_dataset_raw.data]
+train_text_lengths = [len(basic_tokenize(text)) for text in train_dataset_raw.data]
 
 plt.figure(figsize=(10, 6))
 plt.hist(train_text_lengths, bins=50, alpha=0.7, color='blue')
@@ -111,7 +123,7 @@ import numpy as np
 # 计算所有词元的频率
 word_counts = Counter()
 for text in train_dataset_raw.data:
-    word_counts.update(_tokenize_text(text))
+    word_counts.update(basic_tokenize(text))
 
 # 获取频率并按降序排序
 frequencies = sorted(word_counts.values(), reverse=True)
@@ -134,7 +146,7 @@ plt.show()
   <em>图 7-2 词频-排名对数图</em>
 </p>
 
-**分析与结论**:
+**数据分析**:
 - **文本长度长尾分布**：从图 7-1 的文本长度分布直方图可以看出，大部分文本的长度集中在较短的区间，但存在少量长度非常长的“异常值”。这说明直接截断可能会丢失过多信息。
 - **词频齐夫定律**：如图 7-2 的对数坐标图所示，词频分布呈现出典型的“长尾”现象：少数高频词（图左上角）占据了绝大多数的出现次数，而大量词汇（图中长长的“尾巴”）的出现频率极低。
 
@@ -146,10 +158,6 @@ plt.show()
 - **词典构建**：遍历所有训练文本，统计词频，并过滤掉出现次数过少的低频词，以减少词典规模和噪声。同时，词典初始化时会预设两个特殊的Token：`<PAD>`（用于填充，ID为0）和`<UNK>`（用于表示未登录词，ID为1）。
 
 ```python
-import re
-from collections import Counter
-from tqdm import tqdm
-
 class Tokenizer:
     def __init__(self, vocab):
         self.vocab = vocab
@@ -174,7 +182,7 @@ class Tokenizer:
 
 ```
 
-#### 3.2.4 Tokenizer与词典构建
+#### 3.2.4 Tokenizer 与词典构建
 
 基于前面对数据的分析，现在可以正式构建词典和`Tokenizer`。词典将只包含在训练集中出现超过`min_freq`次的词元。
 
@@ -190,7 +198,12 @@ def build_vocab_from_counts(word_counts, min_freq=5):
 vocab = build_vocab_from_counts(word_counts, min_freq=5)
 tokenizer = Tokenizer(vocab)
 
-print(f"过滤后的词典大小 (min_freq=5): {len(tokenizer)}")
+{"vocab_size": len(tokenizer)}
+```
+
+输出：
+```bash
+{'vocab_size': 10983}
 ```
 
 #### 3.2.5 如何处理长文本？
@@ -211,11 +224,11 @@ print(f"过滤后的词典大小 (min_freq=5): {len(tokenizer)}")
 
 `TextClassificationDataset` 负责的核心逻辑是：接收原始文本，调用`tokenizer`进行ID化，并应用 **滑窗分割** 策略处理长文本。如果文本超过`max_len`，则会进行切分。代码中的 `stride` 被设置为 `max_len` 的 80%，意味着每个文本块之间有20%的重叠，这有助于保持上下文信息的连续性。
 
-`collate_fn`函数则负责将一个批次内长短不一的样本，通过 **填充** 操作（使用 `<PAD>` 对应的ID `0`），打包成形状规整的张量，以便模型进行批处理。
-
 ```python
 import torch
-from torch.utils.data import Dataset, DataLoader
+import torch.nn as nn
+from torch.utils.data import Dataset
+from tqdm import tqdm
 
 class TextClassificationDataset(Dataset):
     def __init__(self, texts, labels, tokenizer, max_len=128):
@@ -223,7 +236,6 @@ class TextClassificationDataset(Dataset):
         self.max_len = max_len
         self.processed_data = []
 
-        print("正在处理数据集...")
         for text, label in tqdm(zip(texts, labels), total=len(labels)):
             token_ids = self.tokenizer.convert_tokens_to_ids(self.tokenizer.tokenize(text))
             
@@ -241,7 +253,11 @@ class TextClassificationDataset(Dataset):
 
     def __getitem__(self, idx):
         return self.processed_data[idx]
+```
 
+接着，定义 `collate_fn` 函数，它负责将一个批次内长短不一的样本，通过 **填充** 操作（使用 `<PAD>` 对应的ID `0`），打包成形状规整的张量，以便模型进行批处理。
+
+```python
 def collate_fn(batch):
     max_batch_len = max(len(item["token_ids"]) for item in batch)
     
@@ -259,14 +275,25 @@ def collate_fn(batch):
         "token_ids": torch.tensor(batch_token_ids, dtype=torch.long),
         "labels": torch.tensor(batch_labels, dtype=torch.long),
     }
+```
 
-# 创建Dataset和DataLoader实例
+使用我们创建的 `Dataset` 和 `collate_fn` 来实例化训练和验证数据加载器 `DataLoader`：
+
+```python
+from torch.utils.data import DataLoader
+
 train_dataset = TextClassificationDataset(train_dataset_raw.data, train_dataset_raw.target, tokenizer)
 train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True, collate_fn=collate_fn)
 
 valid_dataset = TextClassificationDataset(test_dataset_raw.data, test_dataset_raw.target, tokenizer)
 valid_loader = DataLoader(valid_dataset, batch_size=32, collate_fn=collate_fn)
 
+{"train_samples": len(train_dataset), "valid_samples": len(valid_dataset), "batch_size": 32}
+```
+
+输出：
+```bash
+{'train_samples': 7142, 'valid_samples': 5408, 'batch_size': 32}
 ```
 
 ### 3.3 步骤二：模型构建
@@ -286,13 +313,7 @@ nn.Embedding(padding_idx=0)
  embedded: [batch_size, seq_len, embed_dim]
      |
      V
-nn.Linear(embed_dim, hidden_dim*2) -> nn.ReLU
-     |
-     V
- hidden_features: [batch_size, seq_len, hidden_dim*2]
-     |
-     V
-nn.Linear(hidden_dim*2, hidden_dim*4) -> nn.ReLU
+nn.Linear(embed_dim, hidden_dim*2) -> nn.ReLU -> nn.Linear(hidden_dim*2, hidden_dim*4) -> nn.ReLU
      |
      V
  token_features: [batch_size, seq_len, hidden_dim*4]
@@ -340,10 +361,9 @@ Output:
 
 #### 3.3.3 模型代码
 
-```python
-import torch.nn as nn
-import torch.nn.functional as F
+根据上述分析，下面是 `TextClassifier` 模型的完整实现：
 
+```python
 class TextClassifier(nn.Module):
     def __init__(self, vocab_size, embed_dim, hidden_dim, num_classes):
         super(TextClassifier, self).__init__()
@@ -353,24 +373,33 @@ class TextClassifier(nn.Module):
             nn.Linear(embed_dim, hidden_dim * 2),
             nn.ReLU(),
             nn.Linear(hidden_dim * 2, hidden_dim * 4),
-            nn.ReLU(),
+            nn.ReLU()
         )
         
         self.classifier = nn.Linear(hidden_dim * 4, num_classes)
         
     def forward(self, token_ids):
+        embedded = self.embedding(token_ids)
+        token_features = self.feature_extractor(embedded)
+        
+        # shapes:
         # token_ids: [batch_size, seq_len]
-        embedded = self.embedding(token_ids) # -> [batch_size, seq_len, embed_dim]
-        hidden_features = self.feature_extractor(embedded) # -> [batch_size, seq_len, hidden_dim * 2]
-        token_features = self.feature_extractor(embedded) # -> [batch_size, seq_len, hidden_dim * 4]
+        # embedded: [batch_size, seq_len, embed_dim]
+        # token_features: [batch_size, seq_len, hidden_dim * 4]
+        # padding_mask: [batch_size, seq_len]
+        # masked_features: [batch_size, seq_len, hidden_dim * 4]
+        # summed_features: [batch_size, hidden_dim * 4]
+        # pooled_features: [batch_size, hidden_dim * 4]
+        # logits: [batch_size, num_classes]
         
-        padding_mask = (token_ids != self.embedding.padding_idx).float() # -> [batch_size, seq_len]
-        masked_features = token_features * padding_mask.unsqueeze(-1) # -> [batch_size, seq_len, hidden_dim * 4]
-        summed_features = torch.sum(masked_features, 1) # -> [batch_size, hidden_dim * 4]
-        real_lengths = padding_mask.sum(1, keepdim=True) # -> [batch_size, 1]
-        pooled_features = summed_features / torch.clamp(real_lengths, min=1e-9) # -> [batch_size, hidden_dim * 4]
+        # --- 掩码平均池化 ---
+        padding_mask = (token_ids != self.embedding.padding_idx).float()
+        masked_features = token_features * padding_mask.unsqueeze(-1)
+        summed_features = torch.sum(masked_features, 1)
+        real_lengths = padding_mask.sum(1, keepdim=True)
+        pooled_features = summed_features / torch.clamp(real_lengths, min=1e-9)
         
-        logits = self.classifier(pooled_features) # -> [batch_size, num_classes]
+        logits = self.classifier(pooled_features)
         
         return logits
 ```
@@ -380,10 +409,11 @@ class TextClassifier(nn.Module):
 将所有与训练、评估、优化和模型保存相关的逻辑都封装到一个`Trainer`类中。这个类负责协调模型、数据和优化器，完成整个训练流程。
 
 ```python
-import torch.nn.functional as F
+import os
+import json
 
 class Trainer:
-    def __init__(self, model, optimizer, criterion, train_loader, valid_loader, device):
+    def __init__(self, model, optimizer, criterion, train_loader, valid_loader, device, output_dir="."):
         self.model = model
         self.optimizer = optimizer
         self.criterion = criterion
@@ -391,11 +421,15 @@ class Trainer:
         self.valid_loader = valid_loader
         self.device = device
         self.best_accuracy = 0.0
+        self.output_dir = output_dir
+        os.makedirs(self.output_dir, exist_ok=True)
+        # 用于记录历史数据
+        self.train_losses = []
+        self.val_accuracies = []
 
     def _run_epoch(self, epoch):
         self.model.train()
         total_loss = 0
-        # 使用tqdm来显示进度条
         for batch in tqdm(self.train_loader, desc=f"Epoch {epoch+1} [训练中]"):
             self.optimizer.zero_grad()
             
@@ -431,58 +465,130 @@ class Trainer:
     def _save_checkpoint(self, epoch, val_accuracy):
         if val_accuracy > self.best_accuracy:
             self.best_accuracy = val_accuracy
-            torch.save(self.model.state_dict(), "best_model.pth")
+            save_path = os.path.join(self.output_dir, "best_model.pth")
+            torch.save(self.model.state_dict(), save_path)
             print(f"新最佳模型已保存! Epoch: {epoch+1}, 验证集准确率: {val_accuracy:.4f}")
 
     def train(self, epochs, tokenizer, label_map):
+        self.train_losses = []
+        self.val_accuracies = []
         for epoch in range(epochs):
             avg_loss = self._run_epoch(epoch)
             val_accuracy = self._evaluate(epoch)
             
+            self.train_losses.append(avg_loss)
+            self.val_accuracies.append(val_accuracy)
+
             print(f"Epoch {epoch+1}/{epochs} | 训练损失: {avg_loss:.4f} | 验证集准确率: {val_accuracy:.4f}")
             
             self._save_checkpoint(epoch, val_accuracy)
         
         print("训练完成！")
         # 训练结束后，保存最终的词典和标签映射
-        import json
-        with open('vocab.json', 'w', encoding='utf-8') as f:
+        vocab_path = os.path.join(self.output_dir, 'vocab.json')
+        with open(vocab_path, 'w', encoding='utf-8') as f:
            json.dump(tokenizer.vocab, f, ensure_ascii=False, indent=4)
-        with open('label_map.json', 'w', encoding='utf-8') as f:
+           
+        labels_path = os.path.join(self.output_dir, 'label_map.json')
+        with open(labels_path, 'w', encoding='utf-8') as f:
            json.dump(label_map, f, ensure_ascii=False, indent=4)
-        print("词典 (vocab.json) 和标签映射 (label_map.json) 已保存。")
-
+        print(f"词典 ({vocab_path}) 和标签映射 ({labels_path}) 已保存。")
+        return self.train_losses, self.val_accuracies
 ```
 
 ### 3.5 步骤四：执行训练
 
-通过前面的精心封装，现在执行训练的入口代码变得非常直观和简洁。只需实例化所有需要的“零件”，然后将它们交给“训练总管”`Trainer`即可。
+通过前面的精心封装，现在执行训练的入口代码变得非常直观和简洁。我们首先定义一个超参数字典 `hparams` 来集中管理所有配置，这是一种良好的工程实践。然后，只需实例化所有需要的“零件”，并将它们交给“训练总管”`Trainer`即可。
 
 ```python
 # 超参数
-VOCAB_SIZE = len(tokenizer)
-EMBED_DIM = 128
-HIDDEN_DIM = 256
-NUM_CLASSES = len(train_dataset_raw.target_names)
-EPOCHS = 10
-LEARNING_RATE = 0.001
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+hparams = {
+    "vocab_size": len(tokenizer),
+    "embed_dim": 128,
+    "hidden_dim": 256,
+    "num_classes": len(train_dataset_raw.target_names),
+    "epochs": 20,
+    "learning_rate": 0.001,
+    "device": "cuda" if torch.cuda.is_available() else "cpu",
+    "output_dir": "output"
+}
 
 # 实例化
-model = TextClassifier(VOCAB_SIZE, EMBED_DIM, HIDDEN_DIM, NUM_CLASSES).to(DEVICE)
-criterion = nn.CrossEntropyLoss()
-optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
+model = TextClassifier(
+    hparams["vocab_size"], 
+    hparams["embed_dim"], 
+    hparams["hidden_dim"], 
+    hparams["num_classes"]
+).to(hparams["device"])
 
-# 实例化训练器
-trainer = Trainer(model, optimizer, criterion, train_loader, valid_loader, DEVICE)
+criterion = nn.CrossEntropyLoss()
+optimizer = torch.optim.Adam(model.parameters(), lr=hparams["learning_rate"])
+
+hparams
+```
+
+然后，我们使用这些超参数来实例化模型、损失函数、优化器，并将它们全部交给 `Trainer` 类进行管理。
+
+```python
+trainer = Trainer(
+    model, 
+    optimizer, 
+    criterion, 
+    train_loader, 
+    valid_loader, 
+    hparams["device"], 
+    output_dir=hparams["output_dir"]
+)
 
 # 创建 标签名 -> ID 的映射，并传入 trainer 以便保存
 label_map = {name: i for i, name in enumerate(train_dataset_raw.target_names)}
 
-# 开始训练
-trainer.train(epochs=EPOCHS, tokenizer=tokenizer, label_map=label_map)
-
+# 开始训练，并接收返回的历史数据
+train_losses, val_accuracies = trainer.train(epochs=hparams["epochs"], tokenizer=tokenizer, label_map=label_map)
 ```
+
+#### 3.5.1 训练过程可视化
+
+为了更直观地分析模型的训练过程，例如判断是否收敛、是否存在过拟合等，可以将每个周期的训练损失和验证集准确率绘制成图表。
+
+```python
+def plot_history(train_losses, val_accuracies, title_prefix=""):
+    epochs = range(1, len(train_losses) + 1)
+    
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))
+    
+    # 绘制训练损失曲线
+    ax1.plot(epochs, train_losses, 'bo-', label='Training Loss')
+    ax1.set_title(f'{title_prefix} Training Loss')
+    ax1.set_xlabel('Epochs')
+    ax1.set_ylabel('Loss')
+    ax1.grid(True)
+    ax1.legend()
+    
+    # 绘制验证集准确率曲线
+    ax2.plot(epochs, val_accuracies, 'ro-', label='Validation Accuracy')
+    ax2.set_title(f'{title_prefix} Validation Accuracy')
+    ax2.set_xlabel('Epochs')
+    ax2.set_ylabel('Accuracy')
+    ax2.grid(True)
+    ax2.legend()
+    
+    plt.suptitle(f'{title_prefix} Training and Validation Metrics', fontsize=16)
+    plt.show()
+
+# 调用绘图函数
+plot_history(train_losses, val_accuracies, title_prefix="Feed-Forward Network")
+```
+
+<p align="center">
+  <img src="./images/7_1_3.png" width="70%" alt="训练过程指标" />
+  <br />
+  <em>图 7-3 训练损失与验证集准确率变化曲线</em>
+</p>
+
+从图 7-3 中可以清晰地看到：
+- **训练损失**：随着训练的进行，损失稳步下降并趋于平缓，表明模型在训练数据上得到了有效的学习。
+- **验证集准确率**：准确率逐步提升，并在某个点后开始趋于饱和，这帮助我们判断模型何时达到最佳性能。
 
 ### 3.6 步骤五：模型推理
 
@@ -500,8 +606,6 @@ trainer.train(epochs=EPOCHS, tokenizer=tokenizer, label_map=label_map)
 下面的`Predictor`类将封装完整的推理流程，并实现了“多数投票法”作为聚合策略。
 
 ```python
-import json
-
 class Predictor:
     def __init__(self, model, tokenizer, label_map, device, max_len=128):
         self.model = model.to(device)
@@ -532,32 +636,50 @@ class Predictor:
         final_pred_label = self.id_to_label[final_pred_id]
         return final_pred_label
 
-# --- 完整的推理流程 ---
-# 1. 加载资源
-with open('vocab.json', 'r', encoding='utf-8') as f:
+# 加载资源
+vocab_path = os.path.join(hparams["output_dir"], 'vocab.json')
+with open(vocab_path, 'r', encoding='utf-8') as f:
     loaded_vocab = json.load(f)
-with open('label_map.json', 'r', encoding='utf-8') as f:
+
+labels_path = os.path.join(hparams["output_dir"], 'label_map.json')
+with open(labels_path, 'r', encoding='utf-8') as f:
     label_map_loaded = json.load(f)
 
-# 2. 实例化推理所需组件
+# 实例化推理组件
 inference_tokenizer = Tokenizer(vocab=loaded_vocab)
-inference_model = TextClassifier(len(inference_tokenizer), EMBED_DIM, HIDDEN_DIM, NUM_CLASSES)
-inference_model.load_state_dict(torch.load("best_model.pth"))
+inference_model = TextClassifier(
+    len(inference_tokenizer),
+    hparams["embed_dim"], 
+    hparams["hidden_dim"], 
+    len(label_map_loaded)
+).to(hparams["device"])
 
-# 3. 创建Predictor实例
-predictor = Predictor(inference_model, inference_tokenizer, label_map_loaded, DEVICE)
+model_path = os.path.join(hparams["output_dir"], "best_model.pth")
+inference_model.load_state_dict(torch.load(model_path, map_location=hparams["device"]))
 
-# 4. 预测新文本
+predictor = Predictor(
+    inference_model, 
+    inference_tokenizer, 
+    label_map_loaded, 
+    hparams["device"]
+)
+
+# 预测
 new_text = "The doctor prescribed a new medicine for the patient's illness, focusing on its gpu accelerated healing properties."
 predicted_class = predictor.predict(new_text)
-print(f"\n文本: '{new_text}'")
-print(f"预测类别: {predicted_class}")
 
+{"text": new_text, "pred": predicted_class}
+```
+
+输出：
+```bash
+{'text': "The doctor prescribed a new medicine for the patient's illness, focusing on its gpu accelerated healing properties.",
+ 'pred': 'sci.med'}
 ```
 
 ## 四、过拟合问题
 
-刚刚构建的模型并没有考虑 **过拟合（Overfitting）** 的问题，即模型在训练集上表现优异，但在未见过的验证集或测试集上表现不佳。下面简单介绍两个方案：
+刚刚构建的模型并没有考虑**过拟合（Overfitting）** 的问题，即模型在训练集上表现优异，但在未见过的验证集或测试集上表现不佳。下面简单介绍两个方案：
 
 1. **提前停止（早停）**
    - **思想**：在`Trainer`的`train`方法中，持续监控验证集的准确率（或损失）。如果发现验证集准确率连续N个轮次（N被称为“耐心值”，Patience）都没有超过历史最佳值，就提前终止训练。
@@ -566,7 +688,3 @@ print(f"预测类别: {predicted_class}")
 2. **随机Token遮盖**
    - **思想**：这是一种数据增强方法。在**训练过程**中，随机地将文本中的一部分词元（例如15%）替换为`<UNK>`。这迫使模型不能过度依赖个别“明星词汇”，而是要学习更全面的上下文语义来进行判断，从而提升模型的泛化能力。
    - **实现**：这个修改可以在`TextClassificationDataset`类的`__getitem__`方法中，在返回数据前增加一个随机替换的步骤。注意，此操作只应在训练时进行。
-
----
-
-> Jupyter Notebook 非常适合实验和教学，但在实践中，将代码组织成结构化的 Python 项目（`.py`文件）更利于维护、复用和协作。

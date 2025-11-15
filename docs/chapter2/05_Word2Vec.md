@@ -1,4 +1,4 @@
-# 第三节 从主题模型到Word2Vec
+# 第三节 从主题模型到 Word2Vec
 
 无论是哑编码还是序号化，它们本身都存在一个根本性的缺陷：无法表达词与词之间的 **语义关系**。在这些表示方法中，不同词的向量通常是正交的（如One-Hot编码中点积为0），或者其ID大小关系是随机的，这导致模型无法从输入层面理解“国王”与“女王”的语义比“国王”与“苹果”更近。
 
@@ -248,7 +248,7 @@ $$
 
 ## 练习
 
-- 根据已经学过的内容使用`20newsgroups`数据（from sklearn.datasets import fetch_20newsgroups）实现基于全连接的文本分类模型训练和推理代码。(参考思路，优先自己实现)[https://github.com/datawhalechina/base-nlp/blob/main/docs/chapter7/01_text_classification.md]
+- 根据已经学过的内容使用`20newsgroups`数据（from sklearn.datasets import fetch_20newsgroups）实现基于全连接的文本分类模型训练和推理代码（若自行实现困难，可以参考[文本分类简单实现](https://github.com/datawhalechina/base-nlp/blob/main/docs/chapter7/01_text_classification.md)）
 
 ---
 
