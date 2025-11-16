@@ -50,18 +50,18 @@
 - **第2章：文本表示与词向量**
     - [x] [初级分词技术](./docs/chapter2/03_tokenization.md)
     - [x] [词向量表示](./docs/chapter2/04_word_vector.md)
-    - [x] [从主题模型到Word2Vec](./docs/chapter2/05_Word2Vec.md)
-    - [x] [基于Gensim的词向量实战](./docs/chapter2/06_gensim.md)
+    - [x] [从主题模型到 Word2Vec](./docs/chapter2/05_Word2Vec.md)
+    - [x] [基于 Gensim 的词向量实战](./docs/chapter2/06_gensim.md)
 - **第3章：循环神经网络**
     - [x] [循环神经网络](./docs/chapter3/08_RNN.md)
     - [x] [LSTM 与 GRU](./docs/chapter3/09_LSTM&GRU.md)
 - **第4章：注意力机制与Transformer**
     - [x] [Seq2Seq 架构](./docs/chapter4/10_seq2seq.md)
     - [x] [注意力机制](./docs/chapter4/11_attention.md)
-    - [x] [深入解析Transformer](./docs/chapter4/12_transformer.md)
+    - [x] [深入解析 Transformer](./docs/chapter4/12_transformer.md)
 - **第5章：语言模型**
-    - [x] [BERT 架构及应用](./docs/chapter5/13_Bert.md)
-    - [x] [GPT 架构及应用](./docs/chapter5/14_GPT.md)
+    - [x] [BERT 结构及应用](./docs/chapter5/13_Bert.md)
+    - [x] [GPT 结构及应用](./docs/chapter5/14_GPT.md)
 - **第6章：深入大模型架构**
     - [x] [手搓一个大模型](./docs/chapter6/16_handcraft_llama2.md)
     - [ ] [MOE 架构解析]
