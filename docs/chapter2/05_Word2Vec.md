@@ -161,7 +161,7 @@ $$
 
 > 要做哦，别偷懒 😘
 
-- 根据已经学过的内容使用 `20newsgroups` 数据（from sklearn.datasets import fetch_20newsgroups）实现基于全连接的文本分类模型训练和推理代码（若自行实现困难，可以参考[文本分类简单实现](https://github.com/datawhalechina/base-nlp/blob/main/docs/chapter7/01_text_classification.md)）
+- 根据已经学过的内容使用 `20newsgroups` 数据（from sklearn.datasets import fetch_20newsgroups）实现基于全连接的文本分类模型训练和推理代码（若自行实现困难，可以参考[文本分类简单实现](https://github.com/datawhalechina/base-llm/blob/main/docs/chapter7/01_text_classification.md)）
 
 ---
 

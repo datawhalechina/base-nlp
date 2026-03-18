@@ -272,7 +272,7 @@ $$
 
 > 要做哦，别偷懒 😇
 
-- 在前面的练习中，我们构建了一个基于全连接层的文本分类模型。现在，尝试将其改造为使用 LSTM 网络结构，以更好地捕捉文本中的序列信息。（可以参考[基于 LSTM 的文本分类](https://github.com/datawhalechina/base-nlp/blob/main/docs/chapter7/02_lstm_text_classification.md)）
+- 在前面的练习中，我们构建了一个基于全连接层的文本分类模型。现在，尝试将其改造为使用 LSTM 网络结构，以更好地捕捉文本中的序列信息。（可以参考[基于 LSTM 的文本分类](https://github.com/datawhalechina/base-llm/blob/main/docs/chapter7/02_lstm_text_classification.md)）
 
 ---
 

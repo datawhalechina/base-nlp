@@ -220,70 +220,19 @@ print(f"加载词性词典后: {dic_words}")
 
 <div align="center">
 
-<table border="1" style="margin: 0 auto;">
-<tr>
-  <td style="text-align: center;"><strong>标签</strong></td>
-  <td style="text-align: center;"><strong>含义</strong></td>
-  <td style="text-align: center;"><strong>标签</strong></td>
-  <td style="text-align: center;"><strong>含义</strong></td>
-</tr>
-<tr>
-  <td style="text-align: center;">n</td>
-  <td style="text-align: center;">名词</td>
-  <td style="text-align: center;">nr</td>
-  <td style="text-align: center;">人名</td>
-</tr>
-<tr>
-  <td style="text-align: center;">ns</td>
-  <td style="text-align: center;">地名</td>
-  <td style="text-align: center;">nt</td>
-  <td style="text-align: center;">机构团体</td>
-</tr>
-<tr>
-  <td style="text-align: center;">nz</td>
-  <td style="text-align: center;">其他专名</td>
-  <td style="text-align: center;">v</td>
-  <td style="text-align: center;">动词</td>
-</tr>
-<tr>
-  <td style="text-align: center;">a</td>
-  <td style="text-align: center;">形容词</td>
-  <td style="text-align: center;">d</td>
-  <td style="text-align: center;">副词</td>
-</tr>
-<tr>
-  <td style="text-align: center;">m</td>
-  <td style="text-align: center;">数词</td>
-  <td style="text-align: center;">q</td>
-  <td style="text-align: center;">量词</td>
-</tr>
-<tr>
-  <td style="text-align: center;">r</td>
-  <td style="text-align: center;">代词</td>
-  <td style="text-align: center;">p</td>
-  <td style="text-align: center;">介词</td>
-</tr>
-<tr>
-  <td style="text-align: center;">c</td>
-  <td style="text-align: center;">连词</td>
-  <td style="text-align: center;">u</td>
-  <td style="text-align: center;">助词</td>
-</tr>
-<tr>
-  <td style="text-align: center;">t</td>
-  <td style="text-align: center;">时间词</td>
-  <td style="text-align: center;">x</td>
-  <td style="text-align: center;">非语素字</td>
-</tr>
-<tr>
-  <td style="text-align: center;">w</td>
-  <td style="text-align: center;">标点符号</td>
-  <td style="text-align: center;">un</td>
-  <td style="text-align: center;">未知词</td>
-</tr>
-</table>
+| 标签 | 含义 | 标签 | 含义 |
+| :--: | :--: | :--: | :--: |
+| n | 名词 | nr | 人名 |
+| ns | 地名 | nt | 机构团体 |
+| nz | 其他专名 | v | 动词 |
+| a | 形容词 | d | 副词 |
+| m | 数词 | q | 量词 |
+| r | 代词 | p | 介词 |
+| c | 连词 | u | 助词 |
+| t | 时间词 | x | 非语素字 |
+| w | 标点符号 | un | 未知词 |
 
-<p><em>表 2-1 常见词性标签含义</em></p>
+*表 2-1 常见词性标签含义*
 
 </div>
 
