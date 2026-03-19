@@ -84,11 +84,11 @@ $$ IDF(t, D) = \log \frac{|D|}{|\{d \in D : t \in d\}|} \tag{2.7} $$
 
 $$ IDF(t, D) = \log \frac{|D|}{1 + |\{d \in D : t \in d\}|} \tag{2.8} $$
 
-最终, 一个词的 TF-IDF 权重就是这两者的乘积：
+最终，一个词的 TF-IDF 权重就是这两者的乘积：
 
 $$ TF-IDF(t, d, D) = TF(t, d) \times IDF(t, D) \tag{2.9} $$
 
-一个文档的 TF-IDF 向量, 就是由该文档中每个词的 TF-IDF 值构成的向量。
+一个文档的 TF-IDF 向量，就是由该文档中每个词的 TF-IDF 值构成的向量。
 
 （2）**实际应用**
 
