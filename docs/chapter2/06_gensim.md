@@ -114,7 +114,7 @@ print(tfidf_with_words(first_tfidf, dictionary))
 
 # 5. 对新标题应用模型
 new_headline = "股市大涨，牛市来了"
-new_headline_bow = dictionary.doc2bow(list(jieba.cut(new_headline)))
+new_headline_bow = dictionary.doc2bow(jieba.lcut(new_headline))
 new_headline_tfidf = tfidf_model[new_headline_bow]
 print("\n新标题的 TF-IDF 向量:")
 print(new_headline_tfidf)
