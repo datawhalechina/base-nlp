@@ -272,6 +272,7 @@ valid_loader = DataLoader(valid_dataset, batch_size=32, collate_fn=collate_fn)
 ```
 
 输出如下：
+
 ```bash
 {'train_samples': 7142, 'valid_samples': 5408, 'batch_size': 32}
 ```
