@@ -1,0 +1,6 @@
+config: configs/stages/sft_text.yaml
+vision_model: google/siglip2-base-patch16-224
+
+out_dir: checkpoints/seeker-omni-zh-m2chatml-tok6400/e2e_imgcap_stable
+vision_ckpt: checkpoints/seeker-omni-zh-m2chatml-tok6400/e2e_imgcap_stable/vision/vision_step_000003000.pt
+resampler_ckpt: checkpoints/seeker-omni-zh-m2chatml-tok6400/e2e_imgcap_stable/vision/resampler_step_000003000.pt
