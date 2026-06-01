@@ -1,6 +1,6 @@
 """
 示例四：长文档分析
-演示 MiniMax 204K 超长上下文窗口的处理能力。
+演示 MiniMax-M3 512K 超长上下文窗口的处理能力。
 """
 
 import os
@@ -61,10 +61,10 @@ def analyze_long_document(document: str = SAMPLE_DOCUMENT) -> None:
         base_url="https://api.minimax.io/v1",
     )
 
-    print("=== 长文档分析（MiniMax-M2.7，204K 超长上下文）===\n")
+    print("=== 长文档分析（MiniMax-M3，512K 超长上下文）===\n")
 
     response = client.chat.completions.create(
-        model="MiniMax-M2.7",
+        model="MiniMax-M3",
         messages=[
             {
                 "role": "user",
@@ -83,7 +83,7 @@ def analyze_long_document(document: str = SAMPLE_DOCUMENT) -> None:
     print(f"\n--- Token 使用情况 ---")
     print(f"输入 tokens: {response.usage.prompt_tokens}")
     print(f"输出 tokens: {response.usage.completion_tokens}")
-    print(f"（MiniMax 支持最大 204K 输入 tokens）")
+    print(f"（MiniMax-M3 支持最大 512K 输入 tokens）")
 
 
 if __name__ == "__main__":
