@@ -6,7 +6,7 @@
 
 在本教程主线中，我们学习了如何从零理解、训练和部署大模型。然而在工程实践中，直接调用商业大模型 API 是更常见的选择——它无需本地 GPU 资源，开箱即用，且具备极大的上下文窗口，非常适合快速验证想法、构建应用原型。
 
-**MiniMax** 是国内领先的大模型提供商，其 **MiniMax-M2.7** 系列模型具备 **204K tokens 超长上下文**，并提供兼容 OpenAI 接口规范的 API，方便开发者无缝切换。
+**MiniMax** 是国内领先的大模型提供商，其旗舰模型 **MiniMax-M3** 具备 **512K tokens 超长上下文**，并提供兼容 OpenAI 接口规范的 API，方便开发者无缝切换。
 
 本专题将带你：
 1. 了解 MiniMax API 的核心特性
@@ -20,10 +20,9 @@
 
 | 模型 | 上下文窗口 | 适用场景 |
 |------|-----------|----------|
-| `MiniMax-M2.7` | 204K tokens | 高精度任务、长文档分析 |
-| `MiniMax-M2.7-highspeed` | 204K tokens | 对响应速度有要求的场景 |
-| `MiniMax-M2.5` | 204K tokens | 均衡性能与成本 |
-| `MiniMax-M2.5-highspeed` | 204K tokens | 高并发、低延迟应用 |
+| `MiniMax-M3` | 512K tokens | 旗舰模型，长文档、复杂推理任务首选 |
+| `MiniMax-M2.7` | 204K tokens | 上一代高精度模型，兼容老项目 |
+| `MiniMax-M2.7-highspeed` | 204K tokens | 上一代高速版，对响应速度有要求的场景 |
 
 > **注意**：MiniMax 所有模型的 `temperature` 参数范围为 **(0.0, 1.0]**（不包含 0，包含 1），与部分其他提供商不同，请注意调整。
 
@@ -71,7 +70,7 @@ client = OpenAI(
 )
 
 response = client.chat.completions.create(
-    model="MiniMax-M2.7",
+    model="MiniMax-M3",
     messages=[
         {
             "role": "system",
@@ -114,7 +113,7 @@ client = OpenAI(
 )
 
 stream = client.chat.completions.create(
-    model="MiniMax-M2.7",
+    model="MiniMax-M3",
     messages=[
         {"role": "user", "content": "请详细介绍 BERT 和 GPT 在预训练目标上的主要区别。"},
     ],
@@ -162,7 +161,7 @@ while True:
     messages.append({"role": "user", "content": user_input})
 
     response = client.chat.completions.create(
-        model="MiniMax-M2.7",
+        model="MiniMax-M3",
         messages=messages,
         temperature=0.7,
     )
@@ -175,9 +174,9 @@ while True:
 
 ---
 
-### 示例四：长文档分析（利用 204K 超长上下文）
+### 示例四：长文档分析（利用 512K 超长上下文）
 
-MiniMax 204K 的超长上下文在处理长文档时具有明显优势。以下示例展示如何将长文本一次性送入模型进行分析：
+MiniMax-M3 提供的 512K 超长上下文在处理长文档时具有明显优势。以下示例展示如何将长文本一次性送入模型进行分析：
 
 ```python
 # code/04_long_context.py
@@ -208,11 +207,11 @@ entirely. Experiments on two machine translation tasks show these models to be
 superior in quality while being more parallelizable and requiring significantly
 less time to train.
 
-... [此处可放入实际的长文档内容，MiniMax 支持最长 204K tokens] ...
+... [此处可放入实际的长文档内容，MiniMax-M3 支持最长 512K tokens] ...
 """
 
 response = client.chat.completions.create(
-    model="MiniMax-M2.7",
+    model="MiniMax-M3",
     messages=[
         {
             "role": "user",
@@ -235,7 +234,7 @@ print(f"输出 tokens: {response.usage.completion_tokens}")
 | 维度 | API 调用（MiniMax） | 本地推理（HuggingFace） |
 |------|-------------------|------------------------|
 | **硬件要求** | 无需 GPU | 需要高显存 GPU |
-| **上下文长度** | 204K tokens | 受限于 GPU 显存 |
+| **上下文长度** | 512K tokens（M3） | 受限于 GPU 显存 |
 | **延迟** | 依赖网络 | 本地推理延迟低 |
 | **成本** | 按 token 计费 | 一次性硬件投入 |
 | **数据隐私** | 数据发送至云端 | 数据完全本地 |
@@ -261,7 +260,7 @@ client = OpenAI(
     api_key=os.environ.get("MINIMAX_API_KEY"),
     base_url="https://api.minimax.io/v1",  # ← 修改 base_url
 )
-# model 参数改为 "MiniMax-M2.7" 等 MiniMax 模型名
+# model 参数改为 "MiniMax-M3" 等 MiniMax 模型名
 ```
 
 这意味着已有的基于 OpenAI SDK 的代码，可以以最小改动切换到 MiniMax。
@@ -272,7 +271,7 @@ client = OpenAI(
 
 1. **基础练习**：修改 `01_basic_chat.py`，尝试不同的 `temperature` 值（如 0.1、0.5、1.0），观察输出的差异。
 
-2. **进阶练习**：使用 `MiniMax-M2.7` 和 `MiniMax-M2.7-highspeed` 分别请求同一问题，对比响应时间与质量。
+2. **进阶练习**：使用 `MiniMax-M3` 和 `MiniMax-M2.7-highspeed` 分别请求同一问题，对比响应时间与质量。
 
 3. **综合实践**：选取一篇英文论文的 Abstract，让模型翻译并总结，体验长上下文能力。
 
@@ -281,8 +280,8 @@ client = OpenAI(
 ## 经验总结
 
 - **temperature 范围**：MiniMax 的 temperature 参数区间为 (0.0, 1.0]，设置为 0 会报错，建议最小值设为 0.01。
-- **模型选择**：日常开发调试优先用 `MiniMax-M2.7-highspeed`，对精度要求高时换 `MiniMax-M2.7`。
-- **长文档处理**：204K 超长上下文可以一次性处理大量文本，避免繁琐的文本切分。
+- **模型选择**：默认推荐 `MiniMax-M3`（512K 上下文，旗舰能力）；对响应延迟有要求的场景可使用上一代 `MiniMax-M2.7-highspeed`。
+- **长文档处理**：M3 的 512K 超长上下文可以一次性处理大量文本，避免繁琐的文本切分。
 - **成本控制**：开发阶段可设置较短的 `max_tokens` 限制输出长度，节省 API 费用。
 
 ---

@@ -22,7 +22,7 @@ def basic_chat() -> None:
     )
 
     response = client.chat.completions.create(
-        model="MiniMax-M2.7",
+        model="MiniMax-M3",
         messages=[
             {
                 "role": "system",
@@ -36,7 +36,7 @@ def basic_chat() -> None:
         temperature=0.7,  # MiniMax: temperature ∈ (0.0, 1.0]
     )
 
-    print("=== MiniMax-M2.7 回复 ===")
+    print("=== MiniMax-M3 回复 ===")
     print(response.choices[0].message.content)
     print(f"\n--- Token 使用情况 ---")
     print(f"输入 tokens: {response.usage.prompt_tokens}")

@@ -21,11 +21,11 @@ def streaming_chat() -> None:
         base_url="https://api.minimax.io/v1",
     )
 
-    print("=== 流式输出示例（MiniMax-M2.7）===")
+    print("=== 流式输出示例（MiniMax-M3）===")
     print()
 
     stream = client.chat.completions.create(
-        model="MiniMax-M2.7",
+        model="MiniMax-M3",
         messages=[
             {
                 "role": "user",

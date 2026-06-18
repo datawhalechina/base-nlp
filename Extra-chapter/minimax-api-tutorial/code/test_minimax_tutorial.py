@@ -61,7 +61,7 @@ class TestBasicChat(unittest.TestCase):
         mod.basic_chat()
 
         call_kwargs = mock_client.chat.completions.create.call_args[1]
-        self.assertEqual(call_kwargs["model"], "MiniMax-M2.7")
+        self.assertEqual(call_kwargs["model"], "MiniMax-M3")
         self.assertAlmostEqual(call_kwargs["temperature"], 0.7)
         # temperature must be in (0.0, 1.0]
         self.assertGreater(call_kwargs["temperature"], 0.0)
@@ -204,7 +204,7 @@ class TestLongContext(unittest.TestCase):
         mod.analyze_long_document("这是一段测试文档内容。")
 
         call_kwargs = mock_client.chat.completions.create.call_args[1]
-        self.assertEqual(call_kwargs["model"], "MiniMax-M2.7")
+        self.assertEqual(call_kwargs["model"], "MiniMax-M3")
         self.assertGreater(call_kwargs["temperature"], 0.0)
 
     @patch.dict("os.environ", {"MINIMAX_API_KEY": "test-key-123"})

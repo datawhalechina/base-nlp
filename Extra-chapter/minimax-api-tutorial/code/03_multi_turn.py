@@ -42,7 +42,7 @@ def multi_turn_chat() -> None:
         messages.append({"role": "user", "content": user_input})
 
         response = client.chat.completions.create(
-            model="MiniMax-M2.7",
+            model="MiniMax-M3",
             messages=messages,
             temperature=0.7,
         )
