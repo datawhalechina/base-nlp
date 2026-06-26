@@ -550,7 +550,8 @@ TEST_QUERIES = [ "我该怎么成为天命人？", "如何获得并合成出云�
 
 @torch.no_grad()
 def infer_one(question: str) -> str:
-    # ...（推理逻辑，构造prompt并调用 peft_model.generate）
+    # ...（推理逻辑，利用对话模板构造 input_ids 并调用 peft_model.generate 得到 gen_ids）
+    # out_ids = gen_ids[0, input_ids.shape[-1]:]
     return tokenizer.decode(out_ids, skip_special_tokens=True).strip()
 
 for q in TEST_QUERIES:

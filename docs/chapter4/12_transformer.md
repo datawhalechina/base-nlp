@@ -455,7 +455,7 @@ class Transformer(nn.Module):
         dec_output = self.decode(tgt, enc_output, src_mask, tgt_mask)
         
         # 4. 输出 Logits
-        return self.output(dec_output)
+        logits = self.output(dec_output)
         return logits
 ```
 

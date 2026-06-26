@@ -214,9 +214,10 @@ class GroupedQueryAttention(nn.Module):
         ...
 
     def forward(self, x, start_pos, freqs_cis, mask):
-        xq = self.wq(x).view(batch_size, seq_len, self.n_local_heads, self.head_dim)
-        xk = self.wk(x).view(batch_size, seq_len, self.n_local_kv_heads, self.head_dim)
-        xv = self.wv(x).view(batch_size, seq_len, self.n_local_kv_heads, self.head_dim)
+        bsz, seqlen, _ = x.shape
+        xq = self.wq(x).view(bsz, seqlen, self.n_local_heads, self.head_dim)
+        xk = self.wk(x).view(bsz, seqlen, self.n_local_kv_heads, self.head_dim)
+        xv = self.wv(x).view(bsz, seqlen, self.n_local_kv_heads, self.head_dim)
 
         xq, xk = apply_rotary_emb(xq, xk, freqs_cis=freqs_cis)
         
@@ -359,6 +360,7 @@ class LlamaTransformer(nn.Module):
         self.register_buffer("freqs_cis", precompute_freqs_cis(...))
 
     def forward(self, tokens: torch.Tensor, start_pos: int) -> torch.Tensor:
+        batch_size, seq_len = tokens.shape
         h = self.tok_embeddings(tokens)
         
         # 1. 准备 RoPE 旋转矩阵

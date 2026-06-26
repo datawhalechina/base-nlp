@@ -127,7 +127,7 @@ ViT 虽然实现了图像与文本在**底层架构**上的统一，但这仅仅
 
 ## 三、CLIP 代码实现
 
-> [本节完整代码](https://github.com/datawhalechina/base-llm/blob/main/docs/chapter19/02_clip.py)
+> [本节完整代码](https://github.com/datawhalechina/base-nlp/blob/main/code/C19/02_clip.py)
 
 （1）**图像与文本编码器**
 

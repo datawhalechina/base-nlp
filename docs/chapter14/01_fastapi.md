@@ -313,7 +313,7 @@ ner_deployment/
 下面是 `main.py` 的完整代码：
 
 ```python
-# code/C14/NerPredictor/main.py
+# code/C14/ner_deployment/main.py
 
 import logging
 from fastapi import FastAPI, HTTPException
