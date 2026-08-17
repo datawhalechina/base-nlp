@@ -191,7 +191,7 @@
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=datawhalechina/base-llm&type=Date)](https://star-history.com/#datawhalechina/base-llm&Date)
+[![Star History Chart](https://star-history.dera.page/svg?repos=datawhalechina/base-llm&type=Date)](https://star-history.dera.page/#datawhalechina/base-llm&Date)
 
 <div align="center">
   <p>如果这个项目对你有帮助，请给我们一个 ⭐️</p>
