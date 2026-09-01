@@ -24,7 +24,8 @@ class PositionalEncoding(nn.Module):
         # 填充 PE 矩阵
         # 偶数维度用 sin，奇数维度用 cos
         pe[:, 0::2] = torch.sin(position * div_term)
-        pe[:, 1::2] = torch.cos(position * div_term)
+        # dim 为奇数时，奇数索引槽位比 div_term 少一个
+        pe[:, 1::2] = torch.cos(position * div_term[:pe[:, 1::2].shape[1]])
         
         # 增加 batch 维度: [1, max_seq_len, dim] 以便广播
         pe = pe.unsqueeze(0)
@@ -62,4 +63,3 @@ if __name__ == "__main__":
     print("--- PositionalEncoding Test ---")
     print(f"Input shape: {x.shape}")
     print(f"Output shape: {output.shape}")
-
